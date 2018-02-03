@@ -20,7 +20,7 @@
 typedef uint my_pthread_t;
 
 typedef struct threadControlBlock {
-	my_pthread_t* thread;
+  my_pthread_t* thread;
   struct threadControlBlock* next;
   struct threadControlBlock* prev;
   int prior;
@@ -28,7 +28,7 @@ typedef struct threadControlBlock {
 
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
-	/* add something here */
+  /* add something here */
 } my_pthread_mutex_t;
 
 /* define your data structures here: */
