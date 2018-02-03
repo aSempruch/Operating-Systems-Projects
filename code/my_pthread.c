@@ -18,14 +18,14 @@ tcb* root;
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
-  ucontext_t * nthread = (ucontext_t*)(thread);
+	ucontext_t * nthread = (ucontext_t*)(thread);
 	getcontext(&main);
 	getcontext(nthread);
-  nthread->uc_link=0;
-  nthread->uc_stack.ss_sp=malloc(MEM);
-  nthread->uc_stack.ss_size=MEM;
-  nthread->uc_stack.ss_flags=0;
-  makecontext(nthread, function, 1, arg);
+	nthread->uc_link=0;
+	nthread->uc_stack.ss_sp=malloc(MEM);
+	nthread->uc_stack.ss_size=MEM;
+	nthread->uc_stack.ss_flags=0;
+	makecontext(nthread, function, 1, arg);
 
 	/* Adding new thread to front of LL */
 	tcb* new_thread = (tcb*)malloc(sizeof(tcb));
