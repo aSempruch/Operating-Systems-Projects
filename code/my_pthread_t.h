@@ -20,15 +20,18 @@
 typedef uint my_pthread_t;
 
 typedef struct threadControlBlock {
-  my_pthread_t* thread;
+  ucontext_t* thread;
   struct threadControlBlock* next;
   struct threadControlBlock* prev;
-  int prior;
+  int prior; //Priority, the lower the number the higher the priority
 } tcb;
 
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
-  /* add something here */
+  int state; //0 is unlocked, 1 is locked
+  tcb* head;
+  my_pthread_t owner;
+  pthread_mutexattr_t *attr;
 } my_pthread_mutex_t;
 
 /* define your data structures here: */
