@@ -28,8 +28,11 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	/* Adding new thread to front of LL */
 	tcb* new_thread = (tcb*)malloc(sizeof(tcb));
 	new_thread->thread = nthread;
+	new_thread->tid = thread;
 	new_thread->next = root;
 	new_thread->prior = 1;
+	my_pthread_mutex_init(new_thread->joinQueue, NULL);
+	my_pthread_mutex_lock(new_thread->joinQueue);
 	root = new_thread;
 
 	return 0;
@@ -43,12 +46,10 @@ int my_pthread_yield() {
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {
-	ucontext_t * nthread = (ucontext_t*)(thread);
+	ucontext_t * nthread;
 	getcontext(nthread);
 	tcb* target = gettcb();
-	free(nthread->uc_stack);
-	if(value_ptr != NULL)
-		(int)(*value_ptr) = 1;
+	free(nthread->uc_stack.ss_sp);
 
 	tcb* ptr = root;
 
@@ -57,6 +58,7 @@ void my_pthread_exit(void *value_ptr) {
 			root = root->next;
 		else
 			root = NULL;
+		my_pthread_mutex_unlock(target->joinQueue);
 		free(target);
 		return;
 	}
@@ -65,12 +67,12 @@ void my_pthread_exit(void *value_ptr) {
 		if(ptr->next == target){
 			tcb* temp = ptr->next;
 			ptr->next = ptr->next->next;
+			my_pthread_mutex_unlock(target->joinQueue);
 			free(temp);
 			break;
 		}
 		ptr = ptr->next;
 	}
-	my_pthread_mutex_unlock(jmutex);
 };
 
 /* wait for thread termination */
@@ -81,7 +83,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	jmutex->state = 1;
 	tcb* ptr = root;
 	while(root != NULL){
-		if(*(ptr->thread) == thread)
+		if((ptr->tid) == thread)
 			break;
 		ptr = ptr->next;
 	}
@@ -140,19 +142,56 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
-/* Update Priority of thread and reorder linklist appropriately */
+/* Update Priority of thread and reorder LinkedList appropriately */
 int updatePrior(tcb* thread, int prior){
 	return 0;
 }
-
+/*
 tcb* gettcb(){
 	ucontext_t* curr = (ucontext_t*) sizeof(ucontext_t);
 	getcontext(curr);
 	tcb* ptr = root;
 	while(ptr != NULL){
-		if(*(ptr->thread) == curr)
+		if(*(ptr->tid) == curr)
 			return ptr;
 		ptr = ptr->next;
 	}
 	return NULL;
 }
+*/
+/*
+my_pthread.c:85:21: error: invalid operands to binary expression ('ucontext_t' (aka
+      'struct __darwin_ucontext') and 'my_pthread_t' (aka 'unsigned int'))
+                if(*(ptr->thread) == thread)
+                   ~~~~~~~~~~~~~~ ^  ~~~~~~
+my_pthread.c:104:14: warning: assigning to 'pthread_mutexattr_t *' (aka 'struct
+      _opaque_pthread_mutexattr_t *') from 'const pthread_mutexattr_t *' (aka 'const struct
+      _opaque_pthread_mutexattr_t *') discards qualifiers
+      [-Wincompatible-pointer-types-discards-qualifiers]
+        mutex->attr = mutexattr;
+                    ^ ~~~~~~~~~
+my_pthread.c:113:16: warning: incompatible integer to pointer conversion assigning to 'tcb *' (aka
+      'struct threadControlBlock *') from 'int' [-Wint-conversion]
+                        mutex->head = gettcb();
+                                    ^ ~~~~~~~~
+my_pthread.c:118:13: warning: incompatible integer to pointer conversion assigning to
+      'struct threadControlBlock *' from 'int' [-Wint-conversion]
+                ptr->next = gettcb();
+                          ^ ~~~~~~~~
+my_pthread.c:131:18: warning: comparison between pointer and integer ('tcb *' (aka
+      'struct threadControlBlock *') and 'int')
+                if(mutex->head == gettcb())
+                   ~~~~~~~~~~~ ^  ~~~~~~~~
+my_pthread.c:149:6: error: conflicting types for 'gettcb'
+tcb* gettcb(){
+     ^
+my_pthread.c:42:14: note: previous implicit declaration is here
+        updatePrior(gettcb(), 1);
+                    ^
+my_pthread.c:154:21: error: invalid operands to binary expression ('ucontext_t' (aka
+      'struct __darwin_ucontext') and 'ucontext_t *' (aka 'struct __darwin_ucontext *'))
+                if(*(ptr->thread) == curr)
+                   ~~~~~~~~~~~~~~ ^  ~~~~
+9 warnings and 4 errors generated.
+
+*/
