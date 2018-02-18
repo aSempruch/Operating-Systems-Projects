@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ucontext.h>
 
 typedef uint my_pthread_t;
 
@@ -25,8 +26,9 @@ typedef struct threadControlBlock {
   ucontext_t* thread;
   my_pthread_t tid;
   struct threadControlBlock* next;
-  int prior; //Priority, the lower the number the higher the priority
-  my_pthread_mutex_t* joinQueue;
+  int prior; //Priority, the higher the number the higher the priority
+  struct threadControlBlock* joinQueue;
+  void** joinArg;
 } tcb;
 
 /* mutex struct definition */
@@ -42,6 +44,13 @@ struct my_pthread_mutex_t {
 
 
 /* Function Declarations: */
+
+tcb* gettcb();
+int updatePrior(tcb* thread, int prior);
+int removeFromQueue(tcb* thread);
+int updatePrior2(tcb* thread, int prior);
+tcb* getParent(tcb* thread);
+void startScheduler();
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg);
