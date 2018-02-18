@@ -18,16 +18,45 @@
 ucontext_t create;
 
 tcb* root;
-tcb* lastRan;
+
+// void initialize(){
+// 	struct itimerval it;
+//   struct sigaction act, oact;
+//   act.sa_handler = sighandler;
+//   sigemptyset(&act.sa_mask);
+//   act.sa_flags = 0;
+//
+//   sigaction(SIGPROF, &act, &oact);
+//   // Start itimer
+//   it.it_interval.tv_sec = 4;
+//   it.it_interval.tv_usec = 50000;
+//   it.it_value.tv_sec = 1;
+//   it.it_value.tv_usec = 100000;
+//   setitimer(ITIMER_PROF, &it, NULL);
+// }
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
 	short isFirst = 0;
 	if(root == NULL)
 		isFirst = 1;
 	ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
 	getcontext(nthread);
-	nthread->uc_link=0;
+	void (*texit)(void*);
+	texit = &my_pthread_exit;
+	ucontext_t * exitCon = (ucontext_t*) malloc(sizeof(ucontext_t));
+	getcontext(exitCon);
+	exitCon->uc_link=0;
+	exitCon->uc_stack.ss_sp=malloc(MEM/2);
+	exitCon->uc_stack.ss_size=MEM/2;
+	exitCon->uc_stack.ss_flags=0;
+	makecontext(exitCon, texit, 1, NULL);
+
+	nthread->uc_link=exitCon;
 	nthread->uc_stack.ss_sp=malloc(MEM);
 	nthread->uc_stack.ss_size=MEM;
 	nthread->uc_stack.ss_flags=0;
@@ -43,7 +72,6 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	root = new_thread;
 
 	if(isFirst == 1){
-		lastRan = root;
 		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(first);
 		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
@@ -54,6 +82,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		updatePrior(first_thread, 1);
 		first_thread->joinQueue = NULL;
 		root = first_thread;
+		startScheduler();
 /*
 		ucontext_t * scheduler = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(scheduler);
@@ -65,22 +94,27 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		setcontext(scheduler);
 		*/
 	}
+	sigprocmask(SIG_SETMASK, &b, NULL);
 	return 0;
 }
 
 /* give CPU pocession to other user level threads voluntarily */
 int my_pthread_yield() {
-	updatePrior(gettcb(), 1);
+	updatePrior(root, 1);
 	return 0;
 }
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {
-	ucontext_t * nthread;
-	getcontext(nthread);
-	tcb* target = gettcb();
+	printf("MY PTHREAD EXIT BEGIN\n");
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
+
+	tcb* target = root;
 	tcb* queuePtr = target->joinQueue;
-	free(nthread->uc_stack.ss_sp);
+	free(root->thread->uc_stack.ss_sp);
 
 	tcb* ptr = root;
   tcb* temp;
@@ -98,6 +132,7 @@ void my_pthread_exit(void *value_ptr) {
 			queuePtr = temp;
 		}
 		free(target);
+		//setcontext(root->thread);
 		return;
 	}
 
@@ -118,11 +153,16 @@ void my_pthread_exit(void *value_ptr) {
 		}
 		ptr = ptr->next;
 	}
+	sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 /* wait for thread termination */
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
-	tcb* threadPtr = gettcb();
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
+	tcb* threadPtr = root;
 	threadPtr->joinArg = value_ptr;
 	tcb* ptr = root;
 	while(root != NULL){
@@ -142,6 +182,8 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		}
 		queuePtr->next =threadPtr;
 	}
+	sigprocmask(SIG_SETMASK, &b, NULL);
+	setcontext(root->thread);
 	return 0;
 }
 
@@ -163,7 +205,7 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
-	tcb* thread = gettcb();
+	tcb* thread = root;
 	if(mutex->state == 1){
 		removeFromQueue(thread);
 		if(mutex->head == NULL){
@@ -186,7 +228,7 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 		return -1;
 
 	if(mutex->state == 1){
-		//if(mutex->head == gettcb())
+		//if(mutex->head == root)
 			mutex->state = 0;
 	}
 	mutex->head = mutex->head->next;
@@ -304,8 +346,8 @@ int updatePrior(tcb* thread, int prior){
 
 	return 0;
 }
-
-tcb* gettcb(){
+/*
+tcb* gettcb{
 	ucontext_t* curr = (ucontext_t*) malloc(sizeof(ucontext_t));
 	printf("Get context return value: %d\n", getcontext(curr));
 	tcb* ptr = root;
@@ -315,10 +357,10 @@ tcb* gettcb(){
 			return ptr;
 		ptr = ptr->next;
 	}
-	printf("Returning NULL in gettcb()\n");
+	printf("Returning NULL in root\n");
 	return NULL;
 }
-
+*/
 int removeFromQueue(tcb* thread){
 	if(thread == root){
 		root = root->next;
@@ -335,33 +377,38 @@ int removeFromQueue(tcb* thread){
 	return -1;
 }
 
-void *test2(void *arg){
-	printf("MAMANCISCO SUCKS\n");
-	return NULL;
-}
-
-void *test(void *arg){
-	printf("BRANCISCO SUCKS\n");
-	my_pthread_t p2;
-	my_pthread_create(&p2, NULL, test2, NULL);
-	my_pthread_join(p2, NULL);
-	return NULL;
-}
+// void *test2(void *arg){
+// 	printf("MAMANCISCO SUCKS\n");
+// 	return NULL;
+// }
+//
+// void *test(void *arg){
+// 	printf("BRANCISCO SUCKS\n");
+// 	my_pthread_t p2;
+// 	my_pthread_create(&p2, NULL, test2, (void*)"A");
+// 	my_pthread_join(p2, NULL);
+// 	return NULL;
+// }
 
 int count = 0;
-void sighandler(int sig){
+void sighandler(int sig, siginfo_t *si, void *old_context){
  printf("signal occurred %d times\n",sig, ++count);
- lastRan = lastRan->next;
- if(lastRan == NULL)
- 	lastRan = root;
- setcontext(lastRan->thread); //
+ //getcontext(root->thread);
+ //printf("Looping\n");
+ root->thread = (ucontext_t*) old_context;
+ updatePrior(root, root->prior + 10);
+ //lastRan = lastRan->next;
+ //if(lastRan == NULL)
+ //	lastRan = root;
+
+ setcontext(root->thread);
 }
 
 void startScheduler(){
 
 	struct itimerval it;
   struct sigaction act, oact;
-  act.sa_handler = sighandler;
+  act.sa_sigaction = sighandler;
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
 
@@ -372,18 +419,18 @@ void startScheduler(){
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);
-
-	for( ; ; );
+	setcontext(root->thread);
 }
 
-int main(){
-	my_pthread_t p1;
-	printf("Main begin\n");
-
-	my_pthread_create(&p1, NULL, test, (void*)"A");
-	my_pthread_join(p1, NULL);
-
-	printf("Main ends\n");
-
-	return 0;
-}
+// int main(){
+// 	// initialize();
+// 	my_pthread_t p1;
+// 	printf("Main begin\n");
+//
+// 	my_pthread_create(&p1, NULL, test, (void*)"A");
+// 	my_pthread_join(p1, NULL);
+//
+// 	printf("Main ends\n");
+//
+// 	return 0;
+// }
