@@ -44,6 +44,17 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
 	if(isFirst == 1){
 		lastRan = root;
+		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
+		getcontext(first);
+		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
+		first_thread->thread = nthread;
+		first_thread->tid = *thread;
+		first_thread->next = root;
+		first_thread->prior = 1;
+		updatePrior(first_thread, 1);
+		first_thread->joinQueue = NULL;
+		root = first_thread;
+/*
 		ucontext_t * scheduler = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(scheduler);
 		scheduler->uc_link=0;
@@ -52,6 +63,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		scheduler->uc_stack.ss_flags=0;
 		makecontext(scheduler, &startScheduler, 0);
 		setcontext(scheduler);
+		*/
 	}
 	return 0;
 }
@@ -243,9 +255,10 @@ int updatePrior2(tcb* thread, int prior){
 int updatePrior(tcb* thread, int prior){
 	tcb* ptr = root;
 	tcb* parent;
-	while(ptr != NULL && thread != ptr) //Loop through queue
+	while(ptr != NULL && thread != ptr){ //Loop through queue
 		parent = ptr;
 		ptr = ptr->next;
+	}
 	if(ptr == NULL) //Could not find tcb
 		return -1;
 	ptr->prior = prior;
@@ -302,6 +315,7 @@ tcb* gettcb(){
 			return ptr;
 		ptr = ptr->next;
 	}
+	printf("Returning NULL in gettcb()\n");
 	return NULL;
 }
 
@@ -321,8 +335,16 @@ int removeFromQueue(tcb* thread){
 	return -1;
 }
 
+void *test2(void *arg){
+	printf("MAMANCISCO SUCKS\n");
+	return NULL;
+}
+
 void *test(void *arg){
-	printf("%s\n", (char *) arg);
+	printf("BRANCISCO SUCKS\n");
+	my_pthread_t p2;
+	my_pthread_create(&p2, NULL, test2, NULL);
+	my_pthread_join(p2, NULL);
 	return NULL;
 }
 
