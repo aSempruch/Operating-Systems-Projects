@@ -307,7 +307,7 @@ int updatePrior(tcb* thread, int prior){
 
 tcb* gettcb(){
 	ucontext_t* curr = (ucontext_t*) malloc(sizeof(ucontext_t));
-	getcontext(curr);
+	printf("Get context return value: %d\n", getcontext(curr));
 	tcb* ptr = root;
 
 	while(ptr != NULL){
