@@ -112,10 +112,15 @@ void my_pthread_exit(void *value_ptr) {
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
-	tcb* target = root;
-	tcb* queuePtr = target->joinQueue;
-	free(root->thread->uc_stack.ss_sp);
 
+	free(root->thread->uc_stack.ss_sp);
+	tcb* temp = root;
+	removeFromQueue(root);
+	free(temp->thread);
+	free(temp);
+/*
+tcb* target = root;
+tcb* queuePtr = target->joinQueue;
 	tcb* ptr = root;
   tcb* temp;
 	if(target == root){
@@ -132,8 +137,7 @@ void my_pthread_exit(void *value_ptr) {
 			queuePtr = temp;
 		}
 		free(target);
-		//setcontext(root->thread);
-		return;
+
 	}
 
 	while(ptr->next != NULL){
@@ -153,7 +157,11 @@ void my_pthread_exit(void *value_ptr) {
 		}
 		ptr = ptr->next;
 	}
+	*/
 	sigprocmask(SIG_SETMASK, &b, NULL);
+	printf("MY PTHREAD EXIT ENDS, SETTING CONTEXT TO ROOT");
+	setcontext(root->thread);
+	return;
 }
 
 /* wait for thread termination */
