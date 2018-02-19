@@ -75,7 +75,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(first);
 		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
-		first_thread->thread = nthread;
+		first_thread->thread = first;
 		first_thread->tid = *thread;
 		first_thread->next = root;
 		first_thread->prior = 1;
@@ -159,7 +159,7 @@ tcb* queuePtr = target->joinQueue;
 	}
 	*/
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	printf("MY PTHREAD EXIT ENDS, SETTING CONTEXT TO ROOT");
+	printf("MY PTHREAD EXIT ENDS, SETTING CONTEXT TO ROOT\n");
 	setcontext(root->thread);
 	return;
 }
@@ -427,7 +427,8 @@ void startScheduler(){
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);
-	setcontext(root->thread);
+	getcontext(root->thread);
+	setcontext(root->next->thread);
 }
 
 // int main(){
