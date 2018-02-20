@@ -120,7 +120,7 @@ void my_pthread_exit(void *value_ptr) {
 	removeFromQueue(root);
 	free(temp->thread);
 	free(temp);
-/*
+
 tcb* target = root;
 tcb* queuePtr = target->joinQueue;
 	tcb* ptr = root;
@@ -141,7 +141,7 @@ tcb* queuePtr = target->joinQueue;
 		free(target);
 
 	}
-
+/*
 	while(ptr->next != NULL){
 		if(ptr->next == target){
 			tcb* temp = ptr->next;
@@ -432,7 +432,6 @@ void startScheduler(){
   setitimer(ITIMER_PROF, &it, NULL);
 	//getcontext(root->thread);
 	//setcontext(root->next->thread);
-	return;
 }
 
 // int main(){
