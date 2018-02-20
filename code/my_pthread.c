@@ -430,8 +430,8 @@ void startScheduler(){
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);
-	getcontext(root->thread);
-	setcontext(root->next->thread);
+	//getcontext(root->thread);
+	//setcontext(root->next->thread);
 }
 
 // int main(){

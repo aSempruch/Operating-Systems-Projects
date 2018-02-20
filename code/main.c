@@ -1,5 +1,6 @@
 #include "my_pthread_t.h"
 #include <stdio.h>
+#include <ucontext.h>
 
 void *test2(void *arg){
 	printf("MAMANCISCO SUCKS\n");
@@ -7,6 +8,9 @@ void *test2(void *arg){
 }
 
 void *test(void *arg){
+	ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
+	getcontext(nthread);
+	printf("Calling from stack %d\n", &nthread->uc_stack);
 	printf("BRANCISCO SUCKS\n");
 	my_pthread_t p2;
 	//my_pthread_create(&p2, NULL, test2, (void*)"A");
