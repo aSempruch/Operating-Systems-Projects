@@ -1,0 +1,9 @@
+Richard Fernandes rf418
+Orlando Santoni os142
+Alan Sempruch as2322
+
+Design of the scheduler:
+The TCB's have a timed variable that starts at 0, and every time they're interrupted the timed variable
+increments. Threads with higher timed variables will have their priorities decreased.
+
+Results of benchmark:
