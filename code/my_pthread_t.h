@@ -29,6 +29,7 @@ typedef struct threadControlBlock {
   int prior; //Priority, the higher the number the higher the priority
   struct threadControlBlock* joinQueue;
   void** joinArg;
+  int time;
 } tcb;
 
 /* mutex struct definition */

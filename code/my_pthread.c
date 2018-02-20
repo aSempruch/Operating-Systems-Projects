@@ -73,6 +73,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	new_thread->next = root;
 	new_thread->prior = 1;
 	new_thread->joinQueue = NULL;
+	new_thread->time = 0;
 	root = new_thread;
 	if(root->next != NULL){
 		tcb* swap = root->next;
@@ -92,6 +93,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		*mainTid = (my_pthread_t)mainTid;
 		first_thread->next = root;
 		first_thread->prior = 1;
+		first_thread->time = 0;
 		updatePrior(first_thread, 1);
 		first_thread->joinQueue = NULL;
 		root = first_thread;
@@ -452,11 +454,12 @@ int removeFromQueue(tcb* thread){
 int count = 0;
 void sighandler(int sig, siginfo_t *si, void *old_context){
  // printf("signal occurred %d times\n",sig, ++count);
+ root->time++;
  tcb* temp = root;
  //getcontext(root->thread);
  //printf("Looping\n");
  //root->thread = (ucontext_t*) old_context;
- updatePrior(root, root->prior + 10);
+ updatePrior(root, root->prior - 10);
  //lastRan = lastRan->next;
  //if(lastRan == NULL)
  //	lastRan = root;
