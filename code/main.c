@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 void *test2(void *arg){
-	printf("MAMANCISCO SUCKS\n");
+	printf("MAMANCISCO\n");
 	return NULL;
 }
 
@@ -16,12 +16,12 @@ void *test(void *arg){
 	//printf("Calling from stack %d\n", &nthread->uc_stack);
 
 	printf("%s\n", (char*)arg);
-	printf("BRANCISCO SUCKS\n");
+	printf("FRANCISCO\n");
 	my_pthread_t p2;
 	my_pthread_create(&p2, NULL, test2, (void*)"A");
 	printf("got to join\n" );
 	my_pthread_join(p2, NULL);
-	printf("End of Brancisco");
+	printf("End of Francisco");
 	return NULL;
 }
 

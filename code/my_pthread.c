@@ -119,7 +119,6 @@ int my_pthread_yield() {
 
 /* terminate a thread */
 void my_pthread_exit(void *value_ptr) {
-	printf("MY PTHREAD EXIT BEGIN\n");
 	sigset_t a,b;
 	sigemptyset(&a);
 	sigaddset(&a, SIGPROF);
@@ -186,7 +185,6 @@ tcb* queuePtr = target->joinQueue;
 	}
 	*/
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	printf("MY PTHREAD EXIT ENDS, SETTING CONTEXT TO ROOT\n");
 	setcontext(root->thread);
 	return;
 }
@@ -223,7 +221,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		threadPtr->next = NULL;
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	printf("Swapping context in join\n");
+	// printf("Swapping context in join\n");
 	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
@@ -453,7 +451,7 @@ int removeFromQueue(tcb* thread){
 
 int count = 0;
 void sighandler(int sig, siginfo_t *si, void *old_context){
- printf("signal occurred %d times\n",sig, ++count);
+ // printf("signal occurred %d times\n",sig, ++count);
  tcb* temp = root;
  //getcontext(root->thread);
  //printf("Looping\n");
@@ -467,7 +465,7 @@ void sighandler(int sig, siginfo_t *si, void *old_context){
 }
 
 void startScheduler(){
-
+	printf("Using our library\n");
 	struct itimerval it;
   struct sigaction act, oact;
   act.sa_sigaction = sighandler;
@@ -476,8 +474,8 @@ void startScheduler(){
 
   sigaction(SIGPROF, &act, &oact);
   // Start itimer
-  it.it_interval.tv_sec = 4;
-  it.it_interval.tv_usec = 50000;
+  it.it_interval.tv_sec = 0;
+  it.it_interval.tv_usec = 2500;
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);

@@ -77,3 +77,9 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex);
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
 
 #endif
+
+/*my_pthread_t.h:85:24: error: conflicting types for ‘my_pthread_create’
+ #define pthread_create my_pthread_create
+                        ^
+my_pthread_t.h:56:5: note: previous declaration of ‘my_pthread_create’ was here
+ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg);*/
