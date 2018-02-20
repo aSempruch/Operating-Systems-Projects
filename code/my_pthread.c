@@ -36,25 +36,28 @@ tcb* root;
 // }
 
 /* create a new thread */
+ucontext_t * exitCon;
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
 	sigset_t a,b;
 	sigemptyset(&a);
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 	short isFirst = 0;
-	if(root == NULL)
+	if(root == NULL){
 		isFirst = 1;
+		void (*texit)(void*);
+		texit = &my_pthread_exit;
+		exitCon = (ucontext_t*) malloc(sizeof(ucontext_t));
+		getcontext(exitCon);
+		exitCon->uc_link=0;
+		exitCon->uc_stack.ss_sp=malloc(MEM/2);
+		exitCon->uc_stack.ss_size=MEM/2;
+		exitCon->uc_stack.ss_flags=0;
+		makecontext(exitCon, texit, 1, NULL);
+	}
 	ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
 	getcontext(nthread);
-	void (*texit)(void*);
-	texit = &my_pthread_exit;
-	ucontext_t * exitCon = (ucontext_t*) malloc(sizeof(ucontext_t));
-	getcontext(exitCon);
-	exitCon->uc_link=0;
-	exitCon->uc_stack.ss_sp=malloc(MEM/2);
-	exitCon->uc_stack.ss_size=MEM/2;
-	exitCon->uc_stack.ss_flags=0;
-	makecontext(exitCon, texit, 1, NULL);
+
 
 	nthread->uc_link=exitCon;
 	nthread->uc_stack.ss_sp=malloc(MEM);
@@ -65,20 +68,28 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	/* Adding new thread to front of LL */
 	tcb* new_thread = (tcb*)malloc(sizeof(tcb));
 	new_thread->thread = nthread;
-	new_thread->tid = *thread;
+	new_thread->tid = (my_pthread_t)thread;
+	*thread = (my_pthread_t)thread;
 	new_thread->next = root;
 	new_thread->prior = 1;
 	new_thread->joinQueue = NULL;
 	root = new_thread;
-
+	if(root->next != NULL){
+		tcb* swap = root->next;
+		new_thread->next = swap->next;
+		swap->next = new_thread;
+		root = swap;
+	}
 	if(isFirst == 1){
 		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
 		//getcontext(first);
 		first->uc_stack.ss_flags = 0;
 		first->uc_link = 0;
 		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
+		my_pthread_t *mainTid = (my_pthread_t*)malloc(sizeof(my_pthread_t));
 		first_thread->thread = first;
-		first_thread->tid = *thread;
+		first_thread->tid = (my_pthread_t)mainTid;
+		*mainTid = (my_pthread_t)mainTid;
 		first_thread->next = root;
 		first_thread->prior = 1;
 		updatePrior(first_thread, 1);
@@ -114,13 +125,26 @@ void my_pthread_exit(void *value_ptr) {
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
+	tcb* exitThread = root;
+	tcb* joinQueuePtr = root->joinQueue;
+	tcb* tempQueue;
+	while(joinQueuePtr != NULL){
+		tempQueue = joinQueuePtr->next;
+		if(joinQueuePtr->joinArg != NULL)
+			*(joinQueuePtr->joinArg) = value_ptr;
+		joinQueuePtr->next = root;
+		root = joinQueuePtr;
+		updatePrior(root, root->prior);
+		joinQueuePtr = tempQueue;
+	}
 
-	free(root->thread->uc_stack.ss_sp);
-	tcb* temp = root;
-	removeFromQueue(root);
+
+	free(exitThread->thread->uc_stack.ss_sp);
+	tcb* temp = exitThread;
+	removeFromQueue(exitThread);
 	free(temp->thread);
 	free(temp);
-
+/*
 tcb* target = root;
 tcb* queuePtr = target->joinQueue;
 	tcb* ptr = root;
@@ -141,6 +165,7 @@ tcb* queuePtr = target->joinQueue;
 		free(target);
 
 	}
+	*/
 /*
 	while(ptr->next != NULL){
 		if(ptr->next == target){
@@ -175,14 +200,16 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	tcb* threadPtr = root;
 	threadPtr->joinArg = value_ptr;
 	tcb* ptr = root;
-	while(root != NULL){
+	while(ptr != NULL){
 		if((ptr->tid) == thread)
 			break;
 		ptr = ptr->next;
 	}
-	if(ptr->joinQueue == NULL){
+
+	if(ptr->joinQueue == 0){
 		ptr->joinQueue = threadPtr;
 		removeFromQueue(threadPtr);
+		threadPtr->next = NULL;
 	}
 	else{
 		removeFromQueue(threadPtr);
@@ -191,8 +218,10 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 			queuePtr = queuePtr->next;
 		}
 		queuePtr->next =threadPtr;
+		threadPtr->next = NULL;
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
+	printf("Swapping context in join\n");
 	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
@@ -411,7 +440,7 @@ void sighandler(int sig, siginfo_t *si, void *old_context){
  //lastRan = lastRan->next;
  //if(lastRan == NULL)
  //	lastRan = root;
-
+ //printf("Swapping context in scheduler\n");
  swapcontext(temp->thread, root->thread);
 }
 

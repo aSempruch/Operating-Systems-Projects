@@ -8,14 +8,15 @@ void *test2(void *arg){
 }
 
 void *test(void *arg){
-	ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
-	getcontext(nthread);
-	printf("Calling from stack %d\n", &nthread->uc_stack);
+	//ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
+	//getcontext(nthread);
+	//printf("Calling from stack %d\n", &nthread->uc_stack);
 	printf("BRANCISCO SUCKS\n");
 	my_pthread_t p2;
-	//my_pthread_create(&p2, NULL, test2, (void*)"A");
-	//printf("got to join\n" );
-	//my_pthread_join(p2, NULL);
+	my_pthread_create(&p2, NULL, test2, (void*)"A");
+	printf("got to join\n" );
+	my_pthread_join(p2, NULL);
+	printf("End of Brancisco");
 	return NULL;
 }
 
