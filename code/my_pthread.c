@@ -468,7 +468,7 @@ void sighandler(int sig, siginfo_t *si, void *old_context){
 }
 
 void startScheduler(){
-	printf("Using our library\n");
+	//printf("Using our library\n");
 	struct itimerval it;
   struct sigaction act, oact;
   act.sa_sigaction = sighandler;
