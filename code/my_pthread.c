@@ -74,6 +74,8 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	if(isFirst == 1){
 		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(first);
+		first->uc_stack.ss_flags = 0;
+		first->uc_link = 0;
 		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
 		first_thread->thread = first;
 		first_thread->tid = *thread;
@@ -401,15 +403,16 @@ int removeFromQueue(tcb* thread){
 int count = 0;
 void sighandler(int sig, siginfo_t *si, void *old_context){
  printf("signal occurred %d times\n",sig, ++count);
+ tcb* temp = root;
  //getcontext(root->thread);
  //printf("Looping\n");
- root->thread = (ucontext_t*) old_context;
+ //root->thread = (ucontext_t*) old_context;
  updatePrior(root, root->prior + 10);
  //lastRan = lastRan->next;
  //if(lastRan == NULL)
  //	lastRan = root;
 
- setcontext(root->thread);
+ swapcontext(temp->thread, root->thread);
 }
 
 void startScheduler(){
