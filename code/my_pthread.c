@@ -205,6 +205,9 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 			break;
 		ptr = ptr->next;
 	}
+	if(ptr == NULL){
+		return;
+	}
 	if(ptr->joinQueue == 0){
 		ptr->joinQueue = threadPtr;
 		removeFromQueue(threadPtr);
@@ -227,22 +230,35 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 
 /* initial the mutex lock */
 int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
+	char* mal = (char*) malloc(sizeof(char) * 5);
+	my_pthread_mutex_t* test = (my_pthread_mutex_t*)malloc(sizeof(my_pthread_mutex_t));
+
 	//-1 means invalid pointer
-	if(mutex == NULL)
-		return -1;
+	//if(mutex == NULL)
+	//	return -1;
 
 	/*if(*mutex != NULL)
 		return -2;*/
 
-	mutex = (my_pthread_mutex_t*)malloc(sizeof(my_pthread_mutex_t));
+	mutex = test;
 	mutex->state = 0;
 	mutex->attr = mutexattr;
 	mutex->head = NULL;
+	sigprocmask(SIG_SETMASK, &b, NULL);
 	return 0;
 }
 
 /* aquire the mutex lock */
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
+
 	tcb* thread = root;
 	if(mutex->state == 1){
 		removeFromQueue(thread);
@@ -255,11 +271,17 @@ int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
 		ptr->next = thread;
 	}
 	while(mutex->state == 1);
+	sigprocmask(SIG_SETMASK, &b, NULL);
 	return 0;
 }
 
 /* release the mutex lock */
 int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
+	sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
+
 	// -1 error code; mutex already unlocked
 	tcb* ptr = mutex->head;
 	if(mutex->state == 0)
@@ -273,6 +295,7 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 	ptr->next = root;
 	root = ptr;
 	updatePrior(root, root->prior);
+	sigprocmask(SIG_SETMASK, &b, NULL);
 	return 0;
 }
 
