@@ -63,7 +63,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	nthread->uc_stack.ss_sp=malloc(MEM);
 	nthread->uc_stack.ss_size=MEM;
 	nthread->uc_stack.ss_flags=0;
-	makecontext(nthread, function, 1, *((int*) arg));
+	makecontext(nthread, function, 1, (int) arg);
 
 	/* Adding new thread to front of LL */
 	tcb* new_thread = (tcb*)malloc(sizeof(tcb));
@@ -205,7 +205,6 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 			break;
 		ptr = ptr->next;
 	}
-
 	if(ptr->joinQueue == 0){
 		ptr->joinQueue = threadPtr;
 		removeFromQueue(threadPtr);
