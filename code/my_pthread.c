@@ -193,7 +193,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		queuePtr->next =threadPtr;
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	swapcontext(threadPtr, root->next->thread);
+	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
 
