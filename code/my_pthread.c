@@ -73,7 +73,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
 	if(isFirst == 1){
 		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
-		getcontext(first);
+		//getcontext(first);
 		first->uc_stack.ss_flags = 0;
 		first->uc_link = 0;
 		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
@@ -193,7 +193,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		queuePtr->next =threadPtr;
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	setcontext(root->thread);
+	swapcontext(threadPtr, root->next->thread);
 	return 0;
 }
 
@@ -430,8 +430,9 @@ void startScheduler(){
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);
-	getcontext(root->thread);
-	setcontext(root->next->thread);
+	//getcontext(root->thread);
+	//setcontext(root->next->thread);
+	return;
 }
 
 // int main(){
