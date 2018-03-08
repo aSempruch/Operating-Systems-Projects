@@ -9,23 +9,32 @@
 #include<signal.h>
 #include<sys/time.h>
 
+#define page_size sysconf(_SC_PAGE_SIZE)
+
 char mem[8388608];
 char swap[16777216];
 
-int myallocate(int size, __FILE__, __LINE__, THREADREQ){
+int myallocate(int size, int file, int line, int threadreq){
+  int num_pages = (size/(int)page_size);
+  if(size % page_size > 0)
+    num_pages++;
 
+  printf("%d\n", num_pages);
+  printf("%lu\n", page_size);
 }
 
-int mydeallocate(int size, __FILE__, __LINE__, THREADREQ){
-
+int mydeallocate(int size, int file, int line, int threadreq){
+  return 0;
 }
 
 void* shalloc(size_t size){
-
+  return;
 }
 
-
-
+int main(){
+  myallocate(4500, 0, 0, 0);
+  return 0;
+}
 
 
 /*
