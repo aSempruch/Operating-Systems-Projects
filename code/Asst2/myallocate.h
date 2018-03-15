@@ -7,13 +7,29 @@
 
 #include "my_pthread_t.h"
 
+#define THREADREQ 1
+#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
+
 typedef struct _page_entry {
   int start_index;
+  struct _mem_entry* head;
   tcb* owner;
 } page_entry;
 
-int myallocate(int size, int file, int line, int threadreq);
-int mydeallocate(int size, int file, int line, int threadreq);
+typedef struct _page_directory {
+  page_entry * pages;//[8388608/page_size];
+} page_directory;
+
+typedef struct _mem_entry {
+  unsigned int size;
+  int available;
+  struct _mem_entry* next;
+  struct _mem_entry* prev;
+} mem_entry;
+
+void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq);
+int mydeallocate(void* item, char* file, unsigned int line, int threadreq);
 void* shalloc(size_t size);
 
 #endif
