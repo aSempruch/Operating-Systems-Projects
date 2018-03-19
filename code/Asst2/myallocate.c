@@ -9,9 +9,8 @@
 #include<signal.h>
 #include<sys/time.h>
 
-#define page_size sysconf(_SC_PAGE_SIZE)
-
-static char* mem = memalign(page_size, 8388608);
+char* mem;
+//He might have ment to make mem a bracketed array since they're static
 //static char* swap = (char*)memalign(page_size,16777216);
 static page_directory* page_dir;
 static void* memlist[8388608/sizeof(mem_entry) + 1]; //temporary, every page should have a memlist
@@ -29,15 +28,17 @@ int findIndex(){
 }
 
 int initialize(){
-  page_dir = (page_directory*)mem;
-  page_dir->pages = page_entry[8388608/page_size];
+  mem = (char*)memalign(page_size, 8388608);
+  // page_dir = (page_directory*)mem;
+
   int i;
   for(i = 0; i < 8388608/page_size; i++){
-    page_entry page;
-    page.start_index = i*page_size;
-    page.head = NULL;
-    page.owner = NULL;
-    page_dir->pages[i] = page;
+    page_entry * page;
+    page->start_index = i*page_size;
+    page->head = NULL;
+    page->owner = NULL;
+    mem[i*sizeof(page_entry)] = (char*)&page;
+  //  page_dir->pages[i] = page;
   }
 }
 
@@ -52,9 +53,9 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   mem_entry* temp;
   mem_entry* next;
 
-  // if(!init){
-  //   initialize();
-  // }
+  if(!init){
+    initialize();
+  }
 
   if(!malloc_init){
     int i;
@@ -215,15 +216,17 @@ int main(){
 
 
 /*
-myallocate.c:14:20: warning: initialization makes pointer from integer without a cast [enabled by default]
- static char* mem = memalign(page_size, 8388608);
-                    ^
-myallocate.c:14:1: error: initializer element is not constant
- static char* mem = memalign(page_size, 8388608);
- ^
-myallocate.c: In function ‘initialize’:
-myallocate.c:33:21: error: expected expression before ‘page_entry’
-   page_dir->pages = page_entry[8388608/page_size];
+In file included from myallocate.c:5:0:
+myallocate.h:25:19: error: expected ‘:’, ‘,’, ‘;’, ‘}’ or ‘__attribute__’ before ‘=’ token
+
+page_entry test = NULL;
+*/
+
+/*
+struct x {
+    float y;
+} __attribute__((aligned(16)));
+struct x *A = memalign(...);
 */
 
 /*
@@ -240,5 +243,6 @@ myallocate.c:33:21: error: expected expression before ‘page_entry’
 
     Project Notes:
       - You should reserve memory for a thread on the granularity of a system page. You can discover the system page size with "sysconf( _SC_PAGE_SIZE)"
-
+    Questions For TA:
+      - Should we cast mem as (char*) or (mem[])
 */

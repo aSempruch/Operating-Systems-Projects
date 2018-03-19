@@ -10,6 +10,8 @@
 #define THREADREQ 1
 #define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
 #define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
+#define page_size 4096
+//sysconf returns a variable
 
 typedef struct _page_entry {
   int start_index;
@@ -18,7 +20,8 @@ typedef struct _page_entry {
 } page_entry;
 
 typedef struct _page_directory {
-  page_entry * pages;//[8388608/page_size];
+  //page_entry x[8388608/page_size];
+  page_entry pages[8388608/page_size];
 } page_directory;
 
 typedef struct _mem_entry {
