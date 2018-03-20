@@ -9,10 +9,9 @@
 #include<signal.h>
 #include<sys/time.h>
 
-char* mem;
 //He might have ment to make mem a bracketed array since they're static
-//static char* swap = (char*)memalign(page_size,16777216);
-static page_directory* page_dir;
+//static char* swap = (char*)memalign(PAGE_SIZE,16777216);
+static page_directory page_dir;
 static void* memlist[8388608/sizeof(mem_entry) + 1]; //temporary, every page should have a memlist
 static int init = 0;
 static int malloc_init = 0;
@@ -28,23 +27,27 @@ int findIndex(){
 }
 
 int initialize(){
-  mem = (char*)memalign(page_size, 8388608);
+  int i;
+  // for(i = 0; i < 8388608/PAGE_SIZE; i++){
+  //   page_dir.pages[i] = (page_entry)NULL;
+  // }
+
+  mem = (char *) memalign(PAGE_SIZE, 8388608 * sizeof(char));
+  memcpy(mem, &page_dir, sizeof(page_dir));
   // page_dir = (page_directory*)mem;
 
-  int i;
-  for(i = 0; i < 8388608/page_size; i++){
-    page_entry * page;
-    page->start_index = i*page_size;
-    page->head = NULL;
-    page->owner = NULL;
-    mem[i*sizeof(page_entry)] = (char*)&page;
-  //  page_dir->pages[i] = page;
+  for(i = 0; i < 8388608/PAGE_SIZE; i++){
+    page_entry page;
+    page.start_index = i*PAGE_SIZE;
+    page.head = NULL;
+    page.owner = NULL;
+   page_dir.pages[i] = page;
   }
 }
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
-  /*int num_pages = (size/(int)page_size);
-  if(size % page_size > 0)
+  /*int num_pages = (size/(int)PAGE_SIZE);
+  if(size % PAGE_SIZE > 0)
     num_pages++;*/
   if(size == 0)
     return NULL;
@@ -67,7 +70,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
     head->next = NULL;
     head->prev = NULL;
     head->available = 1;
-    head->size = page_size - sizeof(mem_entry);
+    head->size = PAGE_SIZE - sizeof(mem_entry);
     malloc_init = 1;
   }
 
