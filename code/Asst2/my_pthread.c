@@ -7,6 +7,7 @@
 // iLab Server:
 
 #include "my_pthread_t.h"
+#include "myallocate.h"
 #include<stdio.h>
 #include<stdlib.h>
 #include<ucontext.h>
@@ -47,26 +48,26 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		isFirst = 1;
 		void (*texit)(void*);
 		texit = &my_pthread_exit;
-		exitCon = (ucontext_t*) malloc(sizeof(ucontext_t));
+		exitCon = (ucontext_t*) myallocate(sizeof(ucontext_t), __FILE__,__LINE__, 0);
 		getcontext(exitCon);
 		exitCon->uc_link=0;
-		exitCon->uc_stack.ss_sp=malloc(MEM/2);
+		exitCon->uc_stack.ss_sp=myallocate(MEM/2, __FILE__,__LINE__,0);
 		exitCon->uc_stack.ss_size=MEM/2;
 		exitCon->uc_stack.ss_flags=0;
 		makecontext(exitCon, texit, 1, NULL);
 	}
-	ucontext_t * nthread = (ucontext_t*) malloc(sizeof(ucontext_t));
+	ucontext_t * nthread = (ucontext_t*)myallocate(sizeof(ucontext_t), __FILE__,__LINE__, 0);
 	getcontext(nthread);
 
 
 	nthread->uc_link=exitCon;
-	nthread->uc_stack.ss_sp=malloc(MEM);
+	nthread->uc_stack.ss_sp=myallocate(MEM, __FILE__,__LINE__,0);
 	nthread->uc_stack.ss_size=MEM;
 	nthread->uc_stack.ss_flags=0;
 	makecontext(nthread, function, 1, (int) arg);
 
 	/* Adding new thread to front of LL */
-	tcb* new_thread = (tcb*)malloc(sizeof(tcb));
+	tcb* new_thread = (tcb*)myallocate(sizeof(tcb), __FILE__,__LINE__,0);
 	new_thread->thread = nthread;
 	new_thread->tid = (my_pthread_t)thread;
 	*thread = (my_pthread_t)thread;
@@ -82,12 +83,12 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		root = swap;
 	}
 	if(isFirst == 1){
-		ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
+		ucontext_t * first = (ucontext_t*) myallocate(sizeof(ucontext_t), __FILE__,__LINE__,0);
 		//getcontext(first);
 		first->uc_stack.ss_flags = 0;
 		first->uc_link = 0;
-		tcb* first_thread = (tcb*)malloc(sizeof(tcb));
-		my_pthread_t *mainTid = (my_pthread_t*)malloc(sizeof(my_pthread_t));
+		tcb* first_thread = (tcb*)myallocate(sizeof(tcb), __FILE__,__LINE__,0);
+		my_pthread_t *mainTid = (my_pthread_t*)myallocate(sizeof(my_pthread_t), __FILE__, __LINE__, 0);
 		first_thread->thread = first;
 		first_thread->tid = (my_pthread_t)mainTid;
 		*mainTid = (my_pthread_t)mainTid;
@@ -98,16 +99,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		first_thread->joinQueue = NULL;
 		root = first_thread;
 		startScheduler();
-/*
-		ucontext_t * scheduler = (ucontext_t*) malloc(sizeof(ucontext_t));
-		getcontext(scheduler);
-		scheduler->uc_link=0;
-		scheduler->uc_stack.ss_sp=malloc(MEM);
-		scheduler->uc_stack.ss_size=MEM;
-		scheduler->uc_stack.ss_flags=0;
-		makecontext(scheduler, &startScheduler, 0);
-		setcontext(scheduler);
-		*/
+
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	return 0;
@@ -234,8 +226,7 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 	sigemptyset(&a);
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
-	char* mal = (char*) malloc(sizeof(char) * 5);
-	my_pthread_mutex_t* test = (my_pthread_mutex_t*)malloc(sizeof(my_pthread_mutex_t));
+	my_pthread_mutex_t* test = (my_pthread_mutex_t*)myallocate(sizeof(my_pthread_mutex_t), __FILE__, __LINE__,0);
 
 	//-1 means invalid pointer
 	//if(mutex == NULL)
@@ -407,21 +398,7 @@ int updatePrior(tcb* thread, int prior){
 
 	return 0;
 }
-/*
-tcb* gettcb{
-	ucontext_t* curr = (ucontext_t*) malloc(sizeof(ucontext_t));
-	printf("Get context return value: %d\n", getcontext(curr));
-	tcb* ptr = root;
 
-	while(ptr != NULL){
-		if((ptr->thread->uc_stack.ss_sp) == (curr->uc_stack.ss_sp))
-			return ptr;
-		ptr = ptr->next;
-	}
-	printf("Returning NULL in root\n");
-	return NULL;
-}
-*/
 int removeFromQueue(tcb* thread){
 	if(thread == root){
 		root = root->next;
@@ -476,6 +453,8 @@ void startScheduler(){
   act.sa_flags = 0;
 
   sigaction(SIGPROF, &act, &oact);
+
+
   // Start itimer
   it.it_interval.tv_sec = 0;
   it.it_interval.tv_usec = 2500;

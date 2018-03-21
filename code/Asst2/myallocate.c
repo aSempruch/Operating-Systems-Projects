@@ -8,47 +8,122 @@
 #include<assert.h>
 #include<signal.h>
 #include<sys/time.h>
+#include <sys/mman.h>
+#include "my_pthread_t.h"
 
-//He might have ment to make mem a bracketed array since they're static
-//static char* swap = (char*)memalign(PAGE_SIZE,16777216);
-static page_directory page_dir;
-static void* memlist[8388608/sizeof(mem_entry) + 1]; //temporary, every page should have a memlist
 static int init = 0;
 static int malloc_init = 0;
 
-int findIndex(){
-    int i;
-    for(i = 0; i < 5000/sizeof(mem_entry) + 1; i++){
-        if(memlist[i] == 0){
-            return i;
-        }
-    }
-    return -1;
-}
+ static void seghandler(int sig, siginfo_t *si, void *unused){
+   unsigned long address = *((unsigned long*)(si->si_addr));
+   printf("Address: %lu\n", address);
+   return;
+ }
 
 int initialize(){
+  int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
+  page_directory page_dir;
+  posix_memalign((void**)&mem, PAGE_SIZE, MEM_SIZE * sizeof(char));
+
   int i;
-  // for(i = 0; i < 8388608/PAGE_SIZE; i++){
-  //   page_dir.pages[i] = (page_entry)NULL;
-  // }
-
-  mem = (char *) memalign(PAGE_SIZE, 8388608 * sizeof(char));
-  // page_dir = (page_directory*)mem;
-
-  for(i = 0; i < 8388608/PAGE_SIZE; i++){
+  for(i = 0; i < NUM_PAGES; i++){
     page_entry page;
     page.start_index = i*PAGE_SIZE;
+    page.available = 1;
     page.head = NULL;
     page.owner = NULL;
    page_dir.pages[i] = page;
   }
   memcpy(mem, &page_dir, sizeof(page_dir));
+  p_dir = (page_directory*)mem;
+
+  //context table
+  context_directory context_dir;
+
+  for(i = 0; i < NUM_CONTEXTS;i++){
+    context_entry context;
+    context.start = &mem[CONTEXT_START+i];
+    context.available = 1;
+    context.owner = NULL;
+    context_dir.contexts[i] = context;
+  }
+  memcpy(mem+CONTEXT_START,&context_dir, sizeof(context_dir));
+  c_dir = (context_directory*)(mem+CONTEXT_START);
+  //Segfault handler
+
+  struct sigaction seg;
+  seg.sa_sigaction = seghandler;
+  sigemptyset(&seg.sa_mask);
+  seg.sa_flags = SA_SIGINFO;
+
+  if (sigaction(SIGSEGV, &seg, NULL) == -1){
+    printf("Fatal error setting up signal handler\n");
+    exit(EXIT_FAILURE);    //explode!
+  }
+
+  init = 1;
+
+}
+
+int requestPage(){
+  int i;
+  for(i = USER_PAGE_START; i < NUM_PAGES; i++){
+    if(p_dir->pages[i].available == 1){
+      p_dir->pages[i].available = 0;
+      return i;
+    }
+  }
+  //All pages occupied
+  return -1;
 }
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
-  /*int num_pages = (size/(int)PAGE_SIZE);
-  if(size % PAGE_SIZE > 0)
-    num_pages++;*/
+
+
+  if(threadreq == 0){
+      if(size == sizeof(my_pthread_mutex_t)){
+
+      }
+      int i;
+      for(i = 0; i < NUM_CONTEXTS; i++){
+        if(c_dir->contexts[i].available = 1){
+          break;
+        }
+      }
+      if(i == 0){
+        if(size == sizeof(ucontext_t)){
+          return (c_dir->contexts[i].start);
+        }
+        if(size == 64000/2){
+          c_dir->contexts[i].available = 0;
+          return (c_dir->contexts[i].start + sizeof(ucontext_t));
+        }
+      }
+      if(i == 2){
+        if(size == sizeof(ucontext_t)){
+          return (c_dir->contexts[i].start);
+        }
+        if(size == sizeof(tcb)){
+          return (c_dir->contexts[i].start + sizeof(ucontext_t));
+        }
+        if(size == sizeof(my_pthread_t)){
+          c_dir->contexts[i].available = 0;
+          return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
+        }
+      }
+      if(size == sizeof(ucontext_t)){
+        return (c_dir->contexts[i].start);
+      }
+      if(size == sizeof(tcb)){
+        return (c_dir->contexts[i].start + sizeof(ucontext_t));
+      }
+      if(size == 64000){
+        c_dir->contexts[i].available = 0;
+        return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
+      }
+
+  }
+
   if(size == 0)
     return NULL;
 
@@ -61,17 +136,14 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   }
 
   if(!malloc_init){
-    int i;
-    for(i = 0; i < 8388608/sizeof(mem_entry) + 1; i++){
-      memlist[i] = NULL;
-    }
-
-    head = (mem_entry*)mem; //points to beginning of memory (MUST CHANGE TO POINT TO BEGINNING OF PAGE)
+    int i = requestPage();
+    head = (mem_entry*)&mem[PAGE_SIZE*USER_PAGE_START]; //points to beginning of memory (MUST CHANGE TO POINT TO BEGINNING OF PAGE)
     head->next = NULL;
     head->prev = NULL;
     head->available = 1;
     head->size = PAGE_SIZE - sizeof(mem_entry);
     malloc_init = 1;
+    p_dir->pages[1001].head = head;
   }
 
   temp = head;
@@ -98,7 +170,6 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       temp->next = next;
       temp->size = size;
       temp->available = 0;
-      memlist[findIndex()] = temp;
       return(char*)temp+sizeof(mem_entry);
     }
   }
@@ -109,6 +180,8 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
     return -1; //Free failed; cannot free null pointer
   }
 
+  mem_entry* head = p_dir->pages[1001].head;
+  mem_entry* curr = head;
   mem_entry* temp;
   mem_entry* next;
   mem_entry* prev;
@@ -119,10 +192,12 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
 
   int i;
   int isvalid = 0;
-  for(i = 0; i < 8388608/sizeof(mem_entry) + 1; i++){
-    if(memlist[i] == temp && temp->available == 0){
+
+  while(curr != NULL){
+    if(curr == temp && temp->available == 0){
       isvalid = 1;
     }
+    curr = curr->next;
   }
 
   if(!isvalid){
@@ -144,7 +219,7 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
     prev = temp;
   }
 
-  if(next != NULL && next->available == 1){               //Current block is freed, next is available, previous block becomes bigger.
+  if(next != NULL && next->available == 1){ //Current block is freed, next is available, previous block becomes bigger.
     prev->size = prev->size + sizeof(mem_entry) + next->size;
     prev->next = next->next;
     if(next->next != NULL){
@@ -157,6 +232,19 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
 
 void* shalloc(size_t size){
   return;
+}
+
+//Unprotect previous context, protect next context
+void swapMem(tcb* prev, tcb* next){
+  int i;
+  for(i = 0; i < NUM_PAGES; i++){
+    if(p_dir->pages[i].owner == prev){
+      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+    }
+    else if(p_dir->pages[i].owner == next){
+      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+    }
+  }
 }
 
 int main(){
@@ -202,12 +290,21 @@ int main(){
   c = (char *)malloc( 100 );
   free( c );
 
+  //Freeing everything
+  free(z);
+
   //Attempt to saturate the memory for small blocks
   printf("Attempting to saturate memory.\n");
   int increment;
-  for(increment = 0; increment < 1000; increment = increment + sizeof(int)){
+  for(increment = 0; increment < 5000; increment = increment + sizeof(int)){
+    if(increment == 508){
+      printf("Reached point where should be saturated\n");
+    }
+
     int* s = (int*) malloc(sizeof(int));
+
     if(s == NULL){
+      printf("Memory saturated, returned null pointer!\n");
       break;
     }
   }
@@ -217,35 +314,9 @@ int main(){
   return 0;
 }
 
-
 /*
 In file included from myallocate.c:5:0:
-myallocate.h:25:19: error: expected ‘:’, ‘,’, ‘;’, ‘}’ or ‘__attribute__’ before ‘=’ token
-
-page_entry test = NULL;
-*/
-
-/*
-struct x {
-    float y;
-} __attribute__((aligned(16)));
-struct x *A = memalign(...);
-*/
-
-/*
-    Mem : { [ page ] [ page ] [ page ] [ page ] [ page ] [ page ] [ page ] }
-    Page : size = sysconf( _SC_PAGE_SIZE)
-
-      table_entry page_table[]
-      struct table_entry{
-        int start_index
-        int end_index
-        // (end_index - start_index) % sysconf(_SC_PAGE_SIZE) = 0
-      }
-
-
-    Project Notes:
-      - You should reserve memory for a thread on the granularity of a system page. You can discover the system page size with "sysconf( _SC_PAGE_SIZE)"
-    Questions For TA:
-      - Should we cast mem as (char*) or (mem[])
+myallocate.h:64:1: error: unknown type name ‘mutex_directory’
+ mutex_directory *m_dir;
+ ^
 */
