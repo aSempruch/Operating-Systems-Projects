@@ -17,9 +17,9 @@
 #define NUM_PAGES 2048
 #define USER_PAGE_START 1001
 #define SHALLOC_PAGE_START 2045
-#define CONTEXT_START 512512
+#define CONTEXT_START 128
 #define NUM_CONTEXTS 55
-#define MUTEX_START 256256
+#define MUTEX_START 64
 
 typedef struct _mem_entry {
   unsigned int size;
