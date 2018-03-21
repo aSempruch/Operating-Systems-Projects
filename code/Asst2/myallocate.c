@@ -42,13 +42,13 @@ int initialize(){
 
   for(i = 0; i < NUM_CONTEXTS;i++){
     context_entry context;
-    context.start = &mem[CONTEXT_START+i];
+    context.start = &mem[CONTEXT_START* PAGE_SIZE+i*sizeof(context_entry)];
     context.available = 1;
     context.owner = NULL;
     context_dir.contexts[i] = context;
   }
-  memcpy(mem+CONTEXT_START,&context_dir, sizeof(context_dir));
-  c_dir = (context_directory*)(mem+CONTEXT_START);
+  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_dir));
+  c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
   //Segfault handler
 
   struct sigaction seg;
@@ -79,6 +79,9 @@ int requestPage(){
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
 
+  if(!init){
+    initialize();
+  }
 
   if(threadreq == 0){
       if(size == sizeof(my_pthread_mutex_t)){
@@ -86,7 +89,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       }
       int i;
       for(i = 0; i < NUM_CONTEXTS; i++){
-        if(c_dir->contexts[i].available = 1){
+        if(c_dir->contexts[i].available == 1){
           break;
         }
       }
@@ -130,10 +133,6 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   static mem_entry* head;
   mem_entry* temp;
   mem_entry* next;
-
-  if(!init){
-    initialize();
-  }
 
   if(!malloc_init){
     int i = requestPage();
@@ -247,7 +246,7 @@ void swapMem(tcb* prev, tcb* next){
   }
 }
 
-int main(){
+/*int main(){
   //Check if malloc works.
   printf("If malloc works, should print 12\n");
   int* y = (int*) malloc (sizeof(int));
@@ -313,7 +312,7 @@ int main(){
   printf("Tests complete.\n");
   return 0;
 }
-
+*/
 /*
 In file included from myallocate.c:5:0:
 myallocate.h:64:1: error: unknown type name ‘mutex_directory’

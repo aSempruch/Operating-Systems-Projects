@@ -4,7 +4,7 @@
 #include <ucontext.h>
 #include <unistd.h>
 
-int* y
+int* y;
 
 void *test2(void *arg){
 	int x = 12;
@@ -60,3 +60,24 @@ int main(){
 
 	return 0;
 }
+
+/*
+test.c:9:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘void’
+ void *test2(void *arg){
+ ^
+test.c: In function ‘test3’:
+test.c:16:4: error: ‘y’ undeclared (first use in this function)
+   *y = 11;
+    ^
+test.c:16:4: note: each undeclared identifier is reported only once for each function it appears in
+test.c: In function ‘test’:
+test.c:30:31: error: ‘test2’ undeclared (first use in this function)
+  my_pthread_create(&p2, NULL, test2, (void*)"A");
+                               ^
+test.c: In function ‘main’:
+test.c:53:31: error: ‘test2’ undeclared (first use in this function)
+  my_pthread_create(&p1, NULL, test2, NULL);
+                               ^
+test.c:58:30: error: ‘y’ undeclared (first use in this function)
+  printf("Value of y: %d\n", *y);
+*/
