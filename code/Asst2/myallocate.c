@@ -33,7 +33,6 @@ int initialize(){
   // }
 
   mem = (char *) memalign(PAGE_SIZE, 8388608 * sizeof(char));
-  memcpy(mem, &page_dir, sizeof(page_dir));
   // page_dir = (page_directory*)mem;
 
   for(i = 0; i < 8388608/PAGE_SIZE; i++){
@@ -43,6 +42,7 @@ int initialize(){
     page.owner = NULL;
    page_dir.pages[i] = page;
   }
+  memcpy(mem, &page_dir, sizeof(page_dir));
 }
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
