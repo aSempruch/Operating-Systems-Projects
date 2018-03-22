@@ -49,8 +49,8 @@ int initialize(){
     context.owner = NULL;
     context_dir.contexts[i] = context;
   }
-//  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
-//  c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
+  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
+  c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
   //Segfault handler
 
   struct sigaction seg;
