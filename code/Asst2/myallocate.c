@@ -11,8 +11,8 @@
 #include <sys/mman.h>
 #include "my_pthread_t.h"
 
-static int init = 0;
-static int malloc_init = 0;
+int init = 0;
+int malloc_init = 0;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
    unsigned long address = *((unsigned long*)(si->si_addr));
@@ -21,6 +21,7 @@ static int malloc_init = 0;
  }
 
 int initialize(){
+  printf("Running init\n");
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
   page_directory page_dir;
   posix_memalign((void**)&mem, PAGE_SIZE, MEM_SIZE * sizeof(char));
@@ -42,12 +43,12 @@ int initialize(){
 
   for(i = 0; i < NUM_CONTEXTS;i++){
     context_entry context;
-    context.start = &mem[CONTEXT_START* PAGE_SIZE+i*sizeof(context_entry)];
+    context.start = &mem[CONTEXT_START* PAGE_SIZE+ sizeof(context_directory)+i*context_size];
     context.available = 1;
     context.owner = NULL;
     context_dir.contexts[i] = context;
   }
-  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_dir));
+  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
   c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
   //Segfault handler
 
@@ -75,6 +76,11 @@ int requestPage(){
   }
   //All pages occupied
   return -1;
+}
+
+int getCurrentPage(void* ptr){ //Given a pointer return what page it's located in
+  int displacement = (int)ptr - (int)mem;
+  return displacement/PAGE_SIZE;
 }
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
@@ -152,7 +158,22 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       temp = temp->next;
     }
     else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
-      temp->available = 0;
+      int p_num = requestPage();
+      if(p_num == -1){ //No more pages available
+        temp->available = 0;
+        return NULL;
+      }
+
+      int curr_page = getCurrentPage((void*)temp);
+      if(curr_page != p_num+1){ //Pages are not next to each other, gotta swap pages
+        //SWAP THEM PAGES SO THEY'RE CONTINGUOUS
+      } else {
+        p_dir->pages[p_num].head = head;
+        temp->size += PAGE_SIZE;
+        continue;
+      }
+      //Should add space to page and to mem_entry, make continguous.
+      //What if page given not next to curr page?
       return (char*)temp + sizeof(mem_entry); //why?
     }
     else{
@@ -295,8 +316,8 @@ void swapMem(tcb* prev, tcb* next){
   //Attempt to saturate the memory for small blocks
   printf("Attempting to saturate memory.\n");
   int increment;
-  for(increment = 0; increment < 5000; increment = increment + sizeof(int)){
-    if(increment == 508){
+  for(increment = 0; increment < 800; increment = increment + sizeof(int)){
+    if(increment == 548){
       printf("Reached point where should be saturated\n");
     }
 
