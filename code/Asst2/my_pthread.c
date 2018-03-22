@@ -216,6 +216,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	// printf("Swapping context in join\n");
+	swapMem(threadPtr->thread, root->thread);
 	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
@@ -441,6 +442,7 @@ void sighandler(int sig, siginfo_t *si, void *old_context){
  //if(lastRan == NULL)
  //	lastRan = root;
  //printf("Swapping context in scheduler\n");
+ swapMem(temp->thread, root->thread);
  swapcontext(temp->thread, root->thread);
 }
 
