@@ -313,10 +313,12 @@ void swapMem(tcb* prev, tcb* next){
   int i;
   for(i = 0; i < NUM_PAGES; i++){
     if(p_dir->pages[i].owner == prev){
-      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)), PROT_NONE);
+      mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE, PROT_NONE);
     }
     else if(p_dir->pages[i].owner == next){
-      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)),  PROT_READ | PROT_WRITE); 
+      mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
     }
   }
 }
