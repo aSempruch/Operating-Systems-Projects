@@ -90,7 +90,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
     initialize();
   }
 
-  if(threadreq == 0){
+  if(threadreq == 0){ //poop
       if(size == sizeof(my_pthread_mutex_t)){
 
       }
