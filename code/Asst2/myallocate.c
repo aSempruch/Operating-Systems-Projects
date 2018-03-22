@@ -13,6 +13,7 @@
 
 int init = 0;
 int malloc_init = 0;
+int shalloc_init = 0;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
    unsigned long address = *((unsigned long*)(si->si_addr));
@@ -48,8 +49,8 @@ int initialize(){
     context.owner = NULL;
     context_dir.contexts[i] = context;
   }
-  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
-  c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
+//  memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
+//  c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
   //Segfault handler
 
   struct sigaction seg;
@@ -68,7 +69,7 @@ int initialize(){
 
 int requestPage(){
   int i;
-  for(i = USER_PAGE_START; i < NUM_PAGES; i++){
+  for(i = USER_PAGE_START; i < SHALLOC_PAGE_START; i++){
     if(p_dir->pages[i].available == 1){
       p_dir->pages[i].available = 0;
       return i;
@@ -142,13 +143,13 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
 
   if(!malloc_init){
     int i = requestPage();
-    head = (mem_entry*)&mem[PAGE_SIZE*USER_PAGE_START]; //points to beginning of memory (MUST CHANGE TO POINT TO BEGINNING OF PAGE)
+    head = (mem_entry*)&mem[PAGE_SIZE*USER_PAGE_START]; //points to beginning of user space in mem
     head->next = NULL;
     head->prev = NULL;
     head->available = 1;
     head->size = PAGE_SIZE - sizeof(mem_entry);
     malloc_init = 1;
-    p_dir->pages[1001].head = head;
+    p_dir->pages[USER_PAGE_START].head = head;
   }
 
   temp = head;
@@ -251,7 +252,59 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
 }
 
 void* shalloc(size_t size){
-  return;
+  if(!init){
+    initialize();
+  }
+
+  if(size == 0)
+    return NULL;
+
+  static mem_entry* shalloc_head;
+  mem_entry* temp;
+  mem_entry* next;
+
+  if(!shalloc_init){
+    int i;
+    for(i = SHALLOC_PAGE_START; i < NUM_PAGES+1; i++){
+      p_dir->pages[i].available = 0;
+    }
+
+    shalloc_head = (mem_entry*)&mem[PAGE_SIZE*SHALLOC_PAGE_START]; //points to beginning of shalloc space in mem
+    shalloc_head->next = NULL;
+    shalloc_head->prev = NULL;
+    shalloc_head->available = 1;
+    shalloc_head->size = PAGE_SIZE*4 - sizeof(mem_entry);
+    shalloc_init = 1;
+    p_dir->pages[SHALLOC_PAGE_START].head = shalloc_head;
+  }
+
+  temp = shalloc_head;
+
+  while(temp != NULL){
+    if(temp->available != 1 || temp->size < size){
+      temp = temp->next;
+    }
+    else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
+      temp->available = 0;
+      return NULL;
+    }
+    else{
+      next = (mem_entry*)((char*)temp+sizeof(mem_entry)+size);    //Create header for next block
+      next->available = 1;
+      next->prev = temp;
+      next->next = temp->next;
+      next->size = temp->size - sizeof(mem_entry) - size;
+      next->available = 1;
+
+      if(temp->next != NULL)
+        temp->next->prev = next;
+
+      temp->next = next;
+      temp->size = size;
+      temp->available = 0;
+      return(char*)temp+sizeof(mem_entry);
+    }
+  }
 }
 
 //Unprotect previous context, protect next context
@@ -267,16 +320,16 @@ void swapMem(tcb* prev, tcb* next){
   }
 }
 
-/*int main(){
+int main(){
   //Check if malloc works.
   printf("If malloc works, should print 12\n");
-  int* y = (int*) malloc (sizeof(int));
+  int* y = (int*) shalloc (sizeof(int));
   *y = 12;
   printf("%d\n",*y);
 
   //Check if malloc works
   printf("If malloc works, should print 1002\n");
-  int* z = (int*) malloc (sizeof(int));
+  int* z = (int*) shalloc (sizeof(int));
   *z = 1002;
   printf("%d\n",*z);
 
@@ -288,7 +341,7 @@ void swapMem(tcb* prev, tcb* next){
   //free of pointer offset
   printf("Attempting to free an offset of a pointer; offset is not allocated\n");
   char* c;
-  c = (char *)malloc( 200 );
+  c = (char *)shalloc( 200 );
   free(c+10);
 
   //free of something not malloced.
@@ -305,9 +358,9 @@ void swapMem(tcb* prev, tcb* next){
 
   //Below tests should work
   printf("Subsequent actions allowed. No errors returned until saturation test.\n");
-  c = (char *)malloc( 100 );
+  c = (char *)shalloc( 100 );
   free( c );
-  c = (char *)malloc( 100 );
+  c = (char *)shalloc( 100 );
   free( c );
 
   //Freeing everything
@@ -316,12 +369,12 @@ void swapMem(tcb* prev, tcb* next){
   //Attempt to saturate the memory for small blocks
   printf("Attempting to saturate memory.\n");
   int increment;
-  for(increment = 0; increment < 800; increment = increment + sizeof(int)){
+  for(increment = 0; increment < 5000; increment = increment + sizeof(int)){
     if(increment == 548){
       printf("Reached point where should be saturated\n");
     }
 
-    int* s = (int*) malloc(sizeof(int));
+    int* s = (int*) shalloc(sizeof(int));
 
     if(s == NULL){
       printf("Memory saturated, returned null pointer!\n");
@@ -333,7 +386,7 @@ void swapMem(tcb* prev, tcb* next){
   printf("Tests complete.\n");
   return 0;
 }
-*/
+
 /*
 In file included from myallocate.c:5:0:
 myallocate.h:64:1: error: unknown type name ‘mutex_directory’
