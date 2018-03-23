@@ -101,12 +101,19 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   if(!init){
     initialize();
   }
-
+	
   if(threadreq == 0){ //poop
-      if(size == sizeof(my_pthread_mutex_t)){
-
-      }
-      int i;
+	int i;
+      	if(size == sizeof(my_pthread_mutex_t)){
+	
+      		for(i = 0; i < NUM_MUTEXES; i++){
+       	 		if(m_dir->mutexes[i].available == 1){
+         			 break;
+        		}
+     		}
+		m_dir->mutexes[i].available = 0;
+		return (&mem[MUTEX_START * PAGE_SIZE + sizeof(mutex_directory) + i*sizeof( my_pthread_mutex_t)]);
+	}
       for(i = 0; i < NUM_CONTEXTS; i++){
         if(c_dir->contexts[i].available == 1){
           break;
