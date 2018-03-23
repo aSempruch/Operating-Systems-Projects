@@ -20,6 +20,7 @@
 #define CONTEXT_START 100
 #define NUM_CONTEXTS 55
 #define MUTEX_START 64
+#define NUM_MUTEXES 3000
 
 typedef struct _mem_entry {
   unsigned int size;
@@ -51,11 +52,12 @@ typedef struct _context_directory {
 } context_directory;
 
 typedef struct _mutex_entry{
-
+  int available;
+  tcb* owner;
 }mutex_entry;
 
 typedef struct _mutex_directory {
-
+  mutex_entry mutexes[NUM_MUTEXES];
 }mutex_directory;
 
 char *mem;

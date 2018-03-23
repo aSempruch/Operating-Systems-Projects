@@ -118,6 +118,15 @@ void my_pthread_exit(void *value_ptr) {
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
+	//make context space available in memory
+	int i;
+	for(i=0; i < NUM_CONTEXTS; i++){
+		if(c_dir->contexts[i].owner == root){
+			c_dir->contexts[i].available = 1;
+			break;
+		}
+	}
+	
 	tcb* exitThread = root;
 	tcb* joinQueuePtr = root->joinQueue;
 	tcb* tempQueue;

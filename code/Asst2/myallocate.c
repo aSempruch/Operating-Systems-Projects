@@ -51,6 +51,18 @@ int initialize(){
   }
   memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
   c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
+
+//mutex table
+  mutex_directory mutex_dir;
+
+  for(i = 0; i < NUM_MUTEXES;i++){
+    mutex_entry mutex;
+    mutex.available = 1;
+    mutex.owner = NULL;
+    mutex_dir.mutexes[i] = mutex;
+  }
+  memcpy(&mem[MUTEX_START * PAGE_SIZE], &mutex_dir, sizeof(mutex_directory));
+  m_dir = (mutex_directory*)(&mem[MUTEX_START*PAGE_SIZE]);
   //Segfault handler
 
   struct sigaction seg;
