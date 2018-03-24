@@ -11,13 +11,17 @@ void *test2(void *arg){
 	// int * x2 = malloc(sizeof(int));
 	// *x2 = 12;
 	// y = x2;
+	printf("2\n");
 	int *x = malloc(sizeof(int));
 	*x = 12;
+	while(1){}
 }
 
 void *test3(void *arg){
+	printf("3\n");
   int *z = malloc(sizeof(int));
 	*z = 18;
+	while(1){}
 }
 
 my_pthread_mutex_t mutex;
