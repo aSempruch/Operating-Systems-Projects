@@ -39,7 +39,7 @@ int initialize(){
     page.available = 1;
     page.head = NULL;
     page.owner = NULL;
-   page_dir.pages[i] = page;
+    page_dir.pages[i] = page;
   }
   memcpy(mem, &page_dir, sizeof(page_dir));
   p_dir = (page_directory*)mem;
@@ -172,7 +172,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
 
   if(size == 0){
     sigprocmask(SIG_SETMASK, &b, NULL);
-    return NULL
+    return NULL;
   }
 
   static mem_entry* head;
