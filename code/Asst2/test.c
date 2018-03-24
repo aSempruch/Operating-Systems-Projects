@@ -8,15 +8,22 @@ int* y;
 
 void *test2(void *arg){
 	//int x = 12;
-	int * x2 = malloc(sizeof(int));
-	*x2 = 12;
-	y = x2;
-	while(1){}
+	// int * x2 = malloc(sizeof(int));
+	// *x2 = 12;
+	// y = x2;
+	int *x = malloc(sizeof(int));
+	*x = 12;
+	while(1){
+		printf("test2\n");
+	}
 }
 
 void *test3(void *arg){
-  *y = 11;
-	return NULL;
+  int *z = malloc(sizeof(int));
+	*z = 18;
+	while(1){
+		printf("test3\n");
+	}
 }
 
 my_pthread_mutex_t mutex;
@@ -62,24 +69,3 @@ int main(){
 
 	return 0;
 }
-
-/*
-test.c:9:1: error: expected ‘=’, ‘,’, ‘;’, ‘asm’ or ‘__attribute__’ before ‘void’
- void *test2(void *arg){
- ^
-test.c: In function ‘test3’:
-test.c:16:4: error: ‘y’ undeclared (first use in this function)
-   *y = 11;
-    ^
-test.c:16:4: note: each undeclared identifier is reported only once for each function it appears in
-test.c: In function ‘test’:
-test.c:30:31: error: ‘test2’ undeclared (first use in this function)
-  my_pthread_create(&p2, NULL, test2, (void*)"A");
-                               ^
-test.c: In function ‘main’:
-test.c:53:31: error: ‘test2’ undeclared (first use in this function)
-  my_pthread_create(&p1, NULL, test2, NULL);
-                               ^
-test.c:58:30: error: ‘y’ undeclared (first use in this function)
-  printf("Value of y: %d\n", *y);
-*/

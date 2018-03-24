@@ -16,12 +16,17 @@ int malloc_init = 0;
 int shalloc_init = 0;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
-   unsigned long address = *((unsigned long*)(si->si_addr));
-   printf("Address: %lu\n", address);
+   // unsigned long address = *((unsigned long*)(si->si_addr));
+   // printf("Address: %lu\n", address);
+   printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
    return;
  }
 
 int initialize(){
+  sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
   printf("Running init\n");
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
   page_directory page_dir;
@@ -52,7 +57,7 @@ int initialize(){
   memcpy(&mem[CONTEXT_START * PAGE_SIZE], &context_dir, sizeof(context_directory));
   c_dir = (context_directory*)(&mem[CONTEXT_START*PAGE_SIZE]);
 
-//mutex table
+  //mutex table
   mutex_directory mutex_dir;
 
   for(i = 0; i < NUM_MUTEXES;i++){
@@ -66,9 +71,9 @@ int initialize(){
   //Segfault handler
 
   struct sigaction seg;
-  seg.sa_sigaction = seghandler;
-  sigemptyset(&seg.sa_mask);
   seg.sa_flags = SA_SIGINFO;
+  sigemptyset(&seg.sa_mask);
+  seg.sa_sigaction = seghandler;
 
   if (sigaction(SIGSEGV, &seg, NULL) == -1){
     printf("Fatal error setting up signal handler\n");
@@ -76,7 +81,7 @@ int initialize(){
   }
 
   init = 1;
-
+  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 int requestPage(){
@@ -97,21 +102,25 @@ int getCurrentPage(void* ptr){ //Given a pointer return what page it's located i
 }
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
-
+  sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
   if(!init){
     initialize();
   }
-	
-  if(threadreq == 0){ //poop
+
+  if(threadreq == 0){
 	int i;
       	if(size == sizeof(my_pthread_mutex_t)){
-	
+
       		for(i = 0; i < NUM_MUTEXES; i++){
        	 		if(m_dir->mutexes[i].available == 1){
          			 break;
         		}
      		}
 		m_dir->mutexes[i].available = 0;
+    sigprocmask(SIG_SETMASK, &b, NULL);
 		return (&mem[MUTEX_START * PAGE_SIZE + sizeof(mutex_directory) + i*sizeof( my_pthread_mutex_t)]);
 	}
       for(i = 0; i < NUM_CONTEXTS; i++){
@@ -121,41 +130,50 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       }
       if(i == 0){
         if(size == sizeof(ucontext_t)){
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start);
         }
         if(size == 64000/2){
           c_dir->contexts[i].available = 0;
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start + sizeof(ucontext_t));
         }
       }
       if(i == 2){
         if(size == sizeof(ucontext_t)){
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start);
         }
         if(size == sizeof(tcb)){
-	
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start + sizeof(ucontext_t));
         }
         if(size == sizeof(my_pthread_t)){
           c_dir->contexts[i].available = 0;
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
         }
       }
       if(size == sizeof(ucontext_t)){
+        sigprocmask(SIG_SETMASK, &b, NULL);
         return (c_dir->contexts[i].start);
       }
       if(size == sizeof(tcb)){
-	c_dir->contexts[i].available = 0;
+	      c_dir->contexts[i].available = 0;
+        sigprocmask(SIG_SETMASK, &b, NULL);
         return (c_dir->contexts[i].start + sizeof(ucontext_t));
       }
-      if(size == 64000){     
+      if(size == 64000){
+        sigprocmask(SIG_SETMASK, &b, NULL);
         return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
       }
 
   }
 
-  if(size == 0)
-    return NULL;
+  if(size == 0){
+    sigprocmask(SIG_SETMASK, &b, NULL);
+    return NULL
+  }
 
   static mem_entry* head;
   mem_entry* temp;
@@ -170,6 +188,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
     head->size = PAGE_SIZE - sizeof(mem_entry);
     malloc_init = 1;
     p_dir->pages[USER_PAGE_START].head = head;
+    p_dir->pages[USER_PAGE_START].owner = root;
   }
 
   temp = head;
@@ -182,6 +201,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       int p_num = requestPage();
       if(p_num == -1){ //No more pages available
         temp->available = 0;
+        sigprocmask(SIG_SETMASK, &b, NULL);
         return NULL;
       }
 
@@ -195,6 +215,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       }
       //Should add space to page and to mem_entry, make continguous.
       //What if page given not next to curr page?
+      sigprocmask(SIG_SETMASK, &b, NULL);
       return (char*)temp + sizeof(mem_entry); //why?
     }
     else{
@@ -211,13 +232,20 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       temp->next = next;
       temp->size = size;
       temp->available = 0;
+      sigprocmask(SIG_SETMASK, &b, NULL);
       return(char*)temp+sizeof(mem_entry);
     }
   }
+  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
+  sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
   if(item == NULL){
+    sigprocmask(SIG_SETMASK, &b, NULL);
     return -1; //Free failed; cannot free null pointer
   }
 
@@ -228,6 +256,7 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   mem_entry* prev;
   temp = (mem_entry*)((char*)item - sizeof(mem_entry));
   if(temp->available == 1){
+    sigprocmask(SIG_SETMASK, &b, NULL);
     return -1; //Free failed; pointer has not been malloc'ed or has already been freed
   }
 
@@ -242,6 +271,7 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   }
 
   if(!isvalid){
+    sigprocmask(SIG_SETMASK, &b, NULL);
     return -1; //Free failed; Pointer is not allocated
   }
 
@@ -267,17 +297,23 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
       next->next->prev = prev;
     }
   }
-
+  sigprocmask(SIG_SETMASK, &b, NULL);
   return 0;
 }
 
 void* shalloc(size_t size){
+  sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
   if(!init){
     initialize();
   }
 
-  if(size == 0)
+  if(size == 0){
+    sigprocmask(SIG_SETMASK, &b, NULL);
     return NULL;
+  }
 
   static mem_entry* shalloc_head;
   mem_entry* temp;
@@ -306,6 +342,7 @@ void* shalloc(size_t size){
     }
     else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
       temp->available = 0;
+      sigprocmask(SIG_SETMASK, &b, NULL);
       return NULL;
     }
     else{
@@ -322,13 +359,19 @@ void* shalloc(size_t size){
       temp->next = next;
       temp->size = size;
       temp->available = 0;
+      sigprocmask(SIG_SETMASK, &b, NULL);
       return(char*)temp+sizeof(mem_entry);
     }
   }
+  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 //Unprotect previous context, protect next context
 void swapMem(tcb* prev, tcb* next){
+  sigset_t a,b;
+	sigemptyset(&a);
+	sigaddset(&a, SIGPROF);
+	sigprocmask(SIG_BLOCK, &a, &b);
   int i;
   for(i = 0; i < NUM_PAGES; i++){
     if(p_dir->pages[i].owner == prev){
@@ -336,10 +379,11 @@ void swapMem(tcb* prev, tcb* next){
       mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE, PROT_NONE);
     }
     else if(p_dir->pages[i].owner == next){
-      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)),  PROT_READ | PROT_WRITE); 
+      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)),  PROT_READ | PROT_WRITE);
       mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
     }
   }
+  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 /*
 int main(){

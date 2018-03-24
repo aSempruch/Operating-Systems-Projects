@@ -42,7 +42,7 @@ struct my_pthread_mutex_t {
 /* define your data structures here: */
 
 // Feel free to add your own auxiliary data structures
-
+tcb* root;
 
 /* Function Declarations: */
 

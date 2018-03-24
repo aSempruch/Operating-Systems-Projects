@@ -18,23 +18,6 @@
 #define MEM 64000
 ucontext_t create;
 
-tcb* root;
-
-// void initialize(){
-// 	struct itimerval it;
-//   struct sigaction act, oact;
-//   act.sa_handler = sighandler;
-//   sigemptyset(&act.sa_mask);
-//   act.sa_flags = 0;
-//
-//   sigaction(SIGPROF, &act, &oact);
-//   // Start itimer
-//   it.it_interval.tv_sec = 4;
-//   it.it_interval.tv_usec = 50000;
-//   it.it_value.tv_sec = 1;
-//   it.it_value.tv_usec = 100000;
-//   setitimer(ITIMER_PROF, &it, NULL);
-// }
 
 /* create a new thread */
 ucontext_t * exitCon;
@@ -126,7 +109,7 @@ void my_pthread_exit(void *value_ptr) {
 			break;
 		}
 	}
-	
+
 	tcb* exitThread = root;
 	tcb* joinQueuePtr = root->joinQueue;
 	tcb* tempQueue;
@@ -146,47 +129,7 @@ void my_pthread_exit(void *value_ptr) {
 	removeFromQueue(exitThread);
 	free(temp->thread);
 	free(temp);
-/*
-tcb* target = root;
-tcb* queuePtr = target->joinQueue;
-	tcb* ptr = root;
-  tcb* temp;
-	if(target == root){
-		if(root->next != NULL)
-			root = root->next;
-		else
-			root = NULL;
-		while(queuePtr != NULL){
-			temp = queuePtr->next;
-			queuePtr->next = root;
-			root = queuePtr;
-			updatePrior(root, root->prior);
-			*(queuePtr->joinArg) = value_ptr;
-			queuePtr = temp;
-		}
-		free(target);
 
-	}
-	*/
-/*
-	while(ptr->next != NULL){
-		if(ptr->next == target){
-			tcb* temp = ptr->next;
-			ptr->next = ptr->next->next;
-			while(queuePtr != NULL){
-				temp = queuePtr->next;
-				queuePtr->next = root;
-				root = queuePtr;
-				updatePrior(root, root->prior);
-				*(queuePtr->joinArg) = value_ptr;
-				queuePtr = temp;
-			}
-			free(temp);
-			break;
-		}
-		ptr = ptr->next;
-	}
-	*/
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	setcontext(root->thread);
 	return;
@@ -238,12 +181,7 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 	sigprocmask(SIG_BLOCK, &a, &b);
 	my_pthread_mutex_t* test = (my_pthread_mutex_t*)myallocate(sizeof(my_pthread_mutex_t), __FILE__, __LINE__,0);
 
-	//-1 means invalid pointer
-	//if(mutex == NULL)
-	//	return -1;
 
-	/*if(*mutex != NULL)
-		return -2;*/
 
 	mutex = test;
 	mutex->state = 0;
@@ -425,18 +363,7 @@ int removeFromQueue(tcb* thread){
 	return -1;
 }
 
-// void *test2(void *arg){
-// 	printf("MAMANCISCO SUCKS\n");
-// 	return NULL;
-// }
-//
-// void *test(void *arg){
-// 	printf("BRANCISCO SUCKS\n");
-// 	my_pthread_t p2;
-// 	my_pthread_create(&p2, NULL, test2, (void*)"A");
-// 	my_pthread_join(p2, NULL);
-// 	return NULL;
-// }
+
 
 int count = 0;
 void sighandler(int sig, siginfo_t *si, void *old_context){
@@ -475,16 +402,3 @@ void startScheduler(){
 	//getcontext(root->thread);
 	//setcontext(root->next->thread);
 }
-
-// int main(){
-// 	// initialize();
-// 	my_pthread_t p1;
-// 	printf("Main begin\n");
-//
-// 	my_pthread_create(&p1, NULL, test, (void*)"A");
-// 	my_pthread_join(p1, NULL);
-//
-// 	printf("Main ends\n");
-//
-// 	return 0;
-// }
