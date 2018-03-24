@@ -133,11 +133,11 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
           return (c_dir->contexts[i].start);
         }
         if(size == sizeof(tcb)){
-	c_dir->contexts[i].available = 0;
+	
           return (c_dir->contexts[i].start + sizeof(ucontext_t));
         }
         if(size == sizeof(my_pthread_t)){
-          
+          c_dir->contexts[i].available = 0;
           return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
         }
       }
@@ -145,10 +145,10 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
         return (c_dir->contexts[i].start);
       }
       if(size == sizeof(tcb)){
+	c_dir->contexts[i].available = 0;
         return (c_dir->contexts[i].start + sizeof(ucontext_t));
       }
-      if(size == 64000){
-        c_dir->contexts[i].available = 0;
+      if(size == 64000){     
         return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
       }
 
