@@ -150,6 +150,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		ptr = ptr->next;
 	}
 	if(ptr == NULL){
+		sigprocmask(SIG_SETMASK, &b, NULL);
 		return;
 	}
 	if(ptr->joinQueue == 0){
@@ -223,8 +224,10 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 
 	// -1 error code; mutex already unlocked
 	tcb* ptr = mutex->head;
-	if(mutex->state == 0)
+	if(mutex->state == 0){
+		sigprocmask(SIG_SETMASK, &b, NULL);
 		return -1;
+	}
 
 	if(mutex->state == 1){
 		//if(mutex->head == root)

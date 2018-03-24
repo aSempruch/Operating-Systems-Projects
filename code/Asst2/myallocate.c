@@ -16,17 +16,11 @@ int malloc_init = 0;
 int shalloc_init = 0;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
-   // unsigned long address = *((unsigned long*)(si->si_addr));
-   // printf("Address: %lu\n", address);
    printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
    return;
  }
 
 int initialize(){
-  sigset_t a,b;
-	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
-	sigprocmask(SIG_BLOCK, &a, &b);
   printf("Running init\n");
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
   page_directory page_dir;
@@ -81,7 +75,6 @@ int initialize(){
   }
 
   init = 1;
-  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 int requestPage(){
