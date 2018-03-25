@@ -17,15 +17,17 @@
 #include<sys/time.h>
 #define MEM 64000
 ucontext_t create;
-
+int new_count = 0;
 
 /* create a new thread */
 ucontext_t * exitCon;
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
+	new_count++;
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
+	printf("I'm creating a thread!\n");
 	short isFirst = 0;
 	if(root == NULL){
 		isFirst = 1;
@@ -41,6 +43,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		exitCon->uc_stack.ss_flags=0;
 		makecontext(exitCon, texit, 1, NULL);
 	}
+
 	ucontext_t * nthread = (ucontext_t*)myallocate(sizeof(ucontext_t), __FILE__,__LINE__, 0);
 	// ucontext_t * nthread = (ucontext_t*)malloc(sizeof(ucontext_t));
 	getcontext(nthread);
@@ -92,7 +95,12 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		startScheduler();
 
 	}
+	sigemptyset(&b);
 	sigprocmask(SIG_SETMASK, &b, NULL);
+	printf("I finished making a thread!\n");
+	if(new_count == 2){
+		printf("count is 2\n");
+	}
 	return 0;
 }
 
@@ -106,7 +114,7 @@ int my_pthread_yield() {
 void my_pthread_exit(void *value_ptr) {
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
 	// //make context space available in memory
@@ -147,7 +155,7 @@ void my_pthread_exit(void *value_ptr) {
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
 	tcb* threadPtr = root;
 	threadPtr->joinArg = value_ptr;
@@ -158,6 +166,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		ptr = ptr->next;
 	}
 	if(ptr == NULL){
+		sigemptyset(&b);
 		sigprocmask(SIG_SETMASK, &b, NULL);
 		return;
 	}
@@ -175,6 +184,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 		queuePtr->next =threadPtr;
 		threadPtr->next = NULL;
 	}
+	sigemptyset(&b);
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	// printf("Swapping context in join\n");
 	// swapMem(threadPtr->thread, root->thread);
@@ -186,7 +196,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexattr) {
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
 	my_pthread_mutex_t* test = (my_pthread_mutex_t*)myallocate(sizeof(my_pthread_mutex_t), __FILE__, __LINE__,0);
 	// my_pthread_mutex_t* test = (my_pthread_mutex_t*)malloc(sizeof(my_pthread_mutex_t));
@@ -205,7 +215,7 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
 	tcb* thread = root;
@@ -229,7 +239,7 @@ int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
 int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 	sigset_t a,b;
 	sigemptyset(&a);
-	sigaddset(&a, SIGPROF);
+	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
 	// -1 error code; mutex already unlocked
@@ -404,7 +414,7 @@ void startScheduler(){
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
 
-  sigaction(SIGPROF, &act, &oact);
+  sigaction(SIGALRM, &act, &oact);
 
 
   // Start itimer
@@ -412,7 +422,7 @@ void startScheduler(){
   it.it_interval.tv_usec = 2500;
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
-  setitimer(ITIMER_PROF, &it, NULL);
+  setitimer(ITIMER_REAL, &it, NULL);
 	// it.it_interval.tv_sec = 0;
   // it.it_interval.tv_usec = 50000;
   // it.it_value.tv_sec = 0;
