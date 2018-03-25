@@ -3,25 +3,34 @@
 // iLab Server:
 
 #include "myallocate.h"
-#include<stdio.h>
-#include<stdlib.h>
-#include<assert.h>
-#include<signal.h>
-#include<sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <signal.h>
+#include <sys/time.h>
 #include <sys/mman.h>
 #include "my_pthread_t.h"
+#include <fcntl.h>
+#include <string.h>
 
 int init = 0;
 int malloc_init = 0;
 int shalloc_init = 0;
+int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
    printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
+   void* page_ptr_cause;
+   int page_fault_num = getCurrentPage((void*)si->si_addr);
+   page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
+
+   movePagesToFront(root, page_ptr_cause);
    return;
  }
 
 int initialize(){
   printf("Running init\n");
+  createSwap();
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
   page_directory page_dir;
   posix_memalign((void**)&mem, PAGE_SIZE, MEM_SIZE * sizeof(char));
@@ -33,6 +42,7 @@ int initialize(){
     page.available = 1;
     page.head = NULL;
     page.owner = NULL;
+    page.place = 0;
     page_dir.pages[i] = page;
   }
   memcpy(mem, &page_dir, sizeof(page_dir));
@@ -76,7 +86,13 @@ int initialize(){
 
   init = 1;
 }
+createSwap(){
+  swap = open("swapfile", O_RDWR | O_CREAT);
+  lseek(swap, (MEM_SIZE * 2 - 1), SEEK_SET);
+  write(swap, "", 1);
+  lseek(swap, 0, SEEK_SET);
 
+}
 int requestPage(){
   int i;
   for(i = USER_PAGE_START; i < SHALLOC_PAGE_START; i++){
@@ -89,11 +105,64 @@ int requestPage(){
   return -1;
 }
 
+int requestSwap(){
+  int i;
+  for(i = REAL_PAGES; i< NUM_PAGES; i++){
+    if(p_dir->pages[i].available == 1){
+      p_dir->pages[i].available = 0;
+      break;
+    }
+  }
+  if(i = NUM_PAGES){
+    return -1;
+  }
+
+  return i;
+}
+
 int getCurrentPage(void* ptr){ //Given a pointer return what page it's located in
-  int displacement = (int)ptr - (int)mem;
+  long displacement = (char*)ptr - (char*)mem;
   return displacement/PAGE_SIZE;
 }
 
+void swapEmptyPage(int old_page, int new_page){
+  void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
+  void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
+  memcpy(new_page_ptr, old_page_ptr, PAGE_SIZE);
+  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+
+  memset(old_page_ptr, 0 , PAGE_SIZE);
+}
+
+//Look through page table to find it's pages in regular memory, or in the swap file. If both are full then no more pages can be given out
+void movePagesToFront(tcb* thread, void* page_fault){
+  int i;
+  for(i = USER_PAGE_START; i < NUM_PAGES; i++){
+    if(i >= SHALLOC_PAGE_START && i < 2049){ //These are shalloc pages; Leave them alone!
+      continue;
+    }
+    if(p_dir->pages[i].owner == thread){
+      // mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+      // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+      // swapPage(curr_page+1, p_num);
+      // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+    }
+  }
+}
+
+void swapEmptyFile(int old_page, int new_page){
+  lseek(swap, (new_page*PAGE_SIZE - MEM_SIZE), SEEK_SET);
+  void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
+  write(swap, old_page_ptr, PAGE_SIZE);
+  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+
+  lseek(swap, 0, SEEK_SET);
+  memset(old_page_ptr, 0 , PAGE_SIZE);
+
+
+}
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
   sigset_t a,b;
 	sigemptyset(&a);
@@ -172,7 +241,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   mem_entry* temp;
   mem_entry* next;
 
-  if(!malloc_init){
+  if(!malloc_init){ //This should actually happen to each thread! Must fix
     int i = requestPage();
     head = (mem_entry*)&mem[PAGE_SIZE*USER_PAGE_START]; //points to beginning of user space in mem
     head->next = NULL;
@@ -185,7 +254,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   }
 
   temp = head;
-
+  int curr_page = getCurrentPage((void*)temp);
   while(temp != NULL){
     if(temp->available != 1 || temp->size < size){
       temp = temp->next;
@@ -193,23 +262,33 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
     else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
       int p_num = requestPage();
       if(p_num == -1){ //No more pages available
-        temp->available = 0;
-        sigprocmask(SIG_SETMASK, &b, NULL);
-        return NULL;
+        int p_num = requestSwap();
+        if(p_num == -1){
+          temp->available = 0;
+          sigprocmask(SIG_SETMASK, &b, NULL);
+          return NULL;
+        }
+        else{
+
+            mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+            swapEmptyFile(curr_page+1, p_num);
+            p_num = curr_page+1;
+        }
       }
 
-      int curr_page = getCurrentPage((void*)temp);
-      if(curr_page != p_num+1){ //Pages are not next to each other, gotta swap pages
-        //SWAP THEM PAGES SO THEY'RE CONTINGUOUS
-      } else {
-        p_dir->pages[p_num].head = head;
-        temp->size += PAGE_SIZE;
-        continue;
+
+      if(curr_page != (p_num-1)){ //Pages are not next to each other, gotta swap pages
+        mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+        mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+        swapEmptyPage(curr_page+1, p_num);
+        mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
       }
-      //Should add space to page and to mem_entry, make continguous.
-      //What if page given not next to curr page?
+      p_dir->pages[curr_page+1].head = head;
+      p_dir->pages[curr_page+1].owner = p_dir->pages[curr_page].owner;
+      p_dir->pages[curr_page+1].place = p_dir->pages[curr_page].place+1;
+      temp->size += PAGE_SIZE;
       sigprocmask(SIG_SETMASK, &b, NULL);
-      return (char*)temp + sizeof(mem_entry); //why?
+      continue;
     }
     else{
       next = (mem_entry*)((char*)temp+sizeof(mem_entry)+size);    //Create header for next block
@@ -314,7 +393,7 @@ void* shalloc(size_t size){
 
   if(!shalloc_init){
     int i;
-    for(i = SHALLOC_PAGE_START; i < NUM_PAGES+1; i++){
+    for(i = SHALLOC_PAGE_START; i < SHALLOC_PAGE_START + 4; i++){
       p_dir->pages[i].available = 0;
     }
 
@@ -366,7 +445,7 @@ void swapMem(tcb* prev, tcb* next){
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
   int i;
-  for(i = 0; i < NUM_PAGES; i++){
+  for(i = 0; i < SHALLOC_PAGE_START; i++){
     if(p_dir->pages[i].owner == prev){
       mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)), PROT_NONE);
       mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE, PROT_NONE);
@@ -382,13 +461,13 @@ void swapMem(tcb* prev, tcb* next){
 int main(){
   //Check if malloc works.
   printf("If malloc works, should print 12\n");
-  int* y = (int*) shalloc (sizeof(int));
+  int* y = (int*) malloc (sizeof(int));
   *y = 12;
   printf("%d\n",*y);
 
   //Check if malloc works
   printf("If malloc works, should print 1002\n");
-  int* z = (int*) shalloc (sizeof(int));
+  int* z = (int*) malloc (sizeof(int));
   *z = 1002;
   printf("%d\n",*z);
 
@@ -400,7 +479,7 @@ int main(){
   //free of pointer offset
   printf("Attempting to free an offset of a pointer; offset is not allocated\n");
   char* c;
-  c = (char *)shalloc( 200 );
+  c = (char *)malloc( 200 );
   free(c+10);
 
   //free of something not malloced.
@@ -417,9 +496,9 @@ int main(){
 
   //Below tests should work
   printf("Subsequent actions allowed. No errors returned until saturation test.\n");
-  c = (char *)shalloc( 100 );
+  c = (char *)malloc( 100 );
   free( c );
-  c = (char *)shalloc( 100 );
+  c = (char *)malloc( 100 );
   free( c );
 
   //Freeing everything
@@ -428,12 +507,12 @@ int main(){
   //Attempt to saturate the memory for small blocks
   printf("Attempting to saturate memory.\n");
   int increment;
-  for(increment = 0; increment < 5000; increment = increment + sizeof(int)){
-    if(increment == 548){
+  for(increment = 0; increment < 1000; increment = increment + sizeof(int)){
+    if(increment == 4176){
       printf("Reached point where should be saturated\n");
     }
 
-    int* s = (int*) shalloc(sizeof(int));
+    int* s = (int*) malloc(sizeof(int));
 
     if(s == NULL){
       printf("Memory saturated, returned null pointer!\n");
@@ -445,10 +524,4 @@ int main(){
   printf("Tests complete.\n");
   return 0;
 }
-
-/*
-In file included from myallocate.c:5:0:
-myallocate.h:64:1: error: unknown type name ‘mutex_directory’
- mutex_directory *m_dir;
- ^
 */

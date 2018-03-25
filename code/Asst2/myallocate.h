@@ -14,7 +14,9 @@
 #define PAGE_SIZE 4096
 #define MEM_SIZE 8388608
 #define OS_SIZE 4100096
-#define NUM_PAGES 2048
+#define REAL_PAGES 2048
+#define NUM_PAGES 2048 * 3
+#define OS_FREE_SWAP_PAGE 1000
 #define USER_PAGE_START 1001
 #define SHALLOC_PAGE_START 2045
 #define CONTEXT_START 100
@@ -34,6 +36,7 @@ typedef struct _page_entry {
   int available;
   struct _mem_entry* head;
   tcb* owner;
+  int place;
 } page_entry;
 
 

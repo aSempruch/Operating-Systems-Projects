@@ -32,25 +32,30 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 		void (*texit)(void*);
 		texit = &my_pthread_exit;
 		exitCon = (ucontext_t*) myallocate(sizeof(ucontext_t), __FILE__,__LINE__, 0);
+		// exitCon = (ucontext_t*) malloc(sizeof(ucontext_t));
 		getcontext(exitCon);
 		exitCon->uc_link=0;
 		exitCon->uc_stack.ss_sp=myallocate(MEM/2, __FILE__,__LINE__,0);
+		// exitCon->uc_stack.ss_sp=malloc(MEM/2);
 		exitCon->uc_stack.ss_size=MEM/2;
 		exitCon->uc_stack.ss_flags=0;
 		makecontext(exitCon, texit, 1, NULL);
 	}
 	ucontext_t * nthread = (ucontext_t*)myallocate(sizeof(ucontext_t), __FILE__,__LINE__, 0);
+	// ucontext_t * nthread = (ucontext_t*)malloc(sizeof(ucontext_t));
 	getcontext(nthread);
 
 
 	nthread->uc_link=exitCon;
 	nthread->uc_stack.ss_sp=myallocate(MEM, __FILE__,__LINE__,0);
+	// nthread->uc_stack.ss_sp=malloc(MEM);
 	nthread->uc_stack.ss_size=MEM;
 	nthread->uc_stack.ss_flags=0;
 	makecontext(nthread, function, 1, (int) arg);
 
 	/* Adding new thread to front of LL */
 	tcb* new_thread = (tcb*)myallocate(sizeof(tcb), __FILE__,__LINE__,0);
+	// tcb* new_thread = (tcb*)malloc(sizeof(tcb));
 	new_thread->thread = nthread;
 	new_thread->tid = (my_pthread_t)thread;
 	*thread = (my_pthread_t)thread;
@@ -67,11 +72,14 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	}
 	if(isFirst == 1){
 		ucontext_t * first = (ucontext_t*) myallocate(sizeof(ucontext_t), __FILE__,__LINE__,0);
+		// ucontext_t * first = (ucontext_t*) malloc(sizeof(ucontext_t));
 		//getcontext(first);
 		first->uc_stack.ss_flags = 0;
 		first->uc_link = 0;
 		tcb* first_thread = (tcb*)myallocate(sizeof(tcb), __FILE__,__LINE__,0);
+		// tcb* first_thread = (tcb*)malloc(sizeof(tcb));
 		my_pthread_t *mainTid = (my_pthread_t*)myallocate(sizeof(my_pthread_t), __FILE__, __LINE__, 0);
+		// my_pthread_t *mainTid = (my_pthread_t*)malloc(sizeof(my_pthread_t));
 		first_thread->thread = first;
 		first_thread->tid = (my_pthread_t)mainTid;
 		*mainTid = (my_pthread_t)mainTid;
@@ -101,14 +109,14 @@ void my_pthread_exit(void *value_ptr) {
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 
-	//make context space available in memory
-	int i;
-	for(i=0; i < NUM_CONTEXTS; i++){
-		if(c_dir->contexts[i].owner == root){
-			c_dir->contexts[i].available = 1;
-			break;
-		}
-	}
+	// //make context space available in memory
+	// int i;
+	// for(i=0; i < NUM_CONTEXTS; i++){
+	// 	if(c_dir->contexts[i].owner == root){
+	// 		c_dir->contexts[i].available = 1;
+	// 		break;
+	// 	}
+	// }
 
 	tcb* exitThread = root;
 	tcb* joinQueuePtr = root->joinQueue;
@@ -169,7 +177,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	}
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	// printf("Swapping context in join\n");
-	swapMem(threadPtr->thread, root->thread);
+	// swapMem(threadPtr->thread, root->thread);
 	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
@@ -181,6 +189,7 @@ int my_pthread_mutex_init(my_pthread_mutex_t *mutex, const pthread_mutexattr_t *
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
 	my_pthread_mutex_t* test = (my_pthread_mutex_t*)myallocate(sizeof(my_pthread_mutex_t), __FILE__, __LINE__,0);
+	// my_pthread_mutex_t* test = (my_pthread_mutex_t*)malloc(sizeof(my_pthread_mutex_t));
 
 
 
@@ -210,8 +219,9 @@ int my_pthread_mutex_lock(my_pthread_mutex_t *mutex) {
 			ptr = ptr->next;
 		ptr->next = thread;
 	}
-	while(mutex->state == 1);
 	sigprocmask(SIG_SETMASK, &b, NULL);
+	while(mutex->state == 1);
+	mutex->state = 1;
 	return 0;
 }
 
@@ -390,6 +400,7 @@ void startScheduler(){
 	struct itimerval it;
   struct sigaction act, oact;
   act.sa_sigaction = sighandler;
+	// act.sa_handler = sighandler;
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
 
@@ -402,6 +413,13 @@ void startScheduler(){
   it.it_value.tv_sec = 1;
   it.it_value.tv_usec = 100000;
   setitimer(ITIMER_PROF, &it, NULL);
+	// it.it_interval.tv_sec = 0;
+  // it.it_interval.tv_usec = 50000;
+  // it.it_value.tv_sec = 0;
+  // it.it_value.tv_usec = 0;
+  // setitimer(ITIMER_REAL, &it, NULL);
+	//
+	// signal(SIGALRM, sighandler);
 	//getcontext(root->thread);
 	//setcontext(root->next->thread);
 }
