@@ -7,10 +7,6 @@
 int* y;
 
 void *test2(void *arg){
-	//int x = 12;
-	// int * x2 = malloc(sizeof(int));
-	// *x2 = 12;
-	// y = x2;
 	printf("2\n");
 	int *x = malloc(sizeof(int));
 	*x = 12;
@@ -21,9 +17,9 @@ void *test3(void *arg){
 	printf("3\n");
   int *z = malloc(sizeof(int));
 	*z = 18;
-	sigset_t b;
-	sigemptyset(&b);
-	sigprocmask(SIG_SETMASK, &b, NULL);
+	//sigset_t b;
+	//sigemptyset(&b);
+	//sigprocmask(SIG_SETMASK, &b, NULL);
 	while(1){}
 }
 

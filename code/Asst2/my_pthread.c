@@ -54,6 +54,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	// nthread->uc_stack.ss_sp=malloc(MEM);
 	nthread->uc_stack.ss_size=MEM;
 	nthread->uc_stack.ss_flags=0;
+	nthread->uc_sigmask = b;
 	makecontext(nthread, function, 1, (int) arg);
 
 	/* Adding new thread to front of LL */
@@ -187,7 +188,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
 	sigemptyset(&b);
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	// printf("Swapping context in join\n");
-	// swapMem(threadPtr->thread, root->thread);
+	swapMem(threadPtr, root);
 	swapcontext(threadPtr->thread, root->thread);
 	return 0;
 }
@@ -401,7 +402,7 @@ void sighandler(int sig, siginfo_t *si, void *old_context){
  //if(lastRan == NULL)
  //	lastRan = root;
  //printf("Swapping context in scheduler\n");
- swapMem(temp->thread, root->thread);
+ swapMem(temp, root);
  swapcontext(temp->thread, root->thread);
 }
 

@@ -20,15 +20,17 @@ int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
    printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
-   // void* page_ptr_cause;
-   // int page_fault_num = getCurrentPage((void*)si->si_addr);
-   // page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
-   //
-   // movePagesToFront(root, page_ptr_cause);
+   void* page_ptr_cause;
+   int page_fault_num = getCurrentPage((void*)si->si_addr);
+   page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
+
+   movePagesToFront(root, page_ptr_cause);
    return;
  }
 
+/* */
 int initialize(){
+  // Initializes the virtual memory data structure
   printf("Running init\n");
   createSwap();
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
@@ -53,7 +55,7 @@ int initialize(){
 
   for(i = 0; i < NUM_CONTEXTS;i++){
     context_entry context;
-    context.start = &mem[CONTEXT_START* PAGE_SIZE+ sizeof(context_directory)+i*context_size];
+    context.start = &mem[CONTEXT_START* PAGE_SIZE+sizeof(context_directory)+i*context_size];
     context.available = 1;
     context.owner = NULL;
     context_dir.contexts[i] = context;
@@ -86,13 +88,16 @@ int initialize(){
 
   init = 1;
 }
-createSwap(){
+
+/* */
+void createSwap(){
   swap = open("swapfile", O_RDWR | O_CREAT);
   lseek(swap, (MEM_SIZE * 2 - 1), SEEK_SET);
   write(swap, "", 1);
   lseek(swap, 0, SEEK_SET);
-
 }
+
+/* */
 int requestPage(){
   int i;
   for(i = USER_PAGE_START; i < SHALLOC_PAGE_START; i++){
@@ -105,6 +110,7 @@ int requestPage(){
   return -1;
 }
 
+/* */
 int requestSwap(){
   int i;
   for(i = REAL_PAGES; i< NUM_PAGES; i++){
@@ -120,11 +126,13 @@ int requestSwap(){
   return i;
 }
 
+/* */
 int getCurrentPage(void* ptr){ //Given a pointer return what page it's located in
   long displacement = (char*)ptr - (char*)mem;
   return displacement/PAGE_SIZE;
 }
 
+/* Swaps page that is full with empty */
 void swapEmptyPage(int old_page, int new_page){
   void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
@@ -133,10 +141,6 @@ void swapEmptyPage(int old_page, int new_page){
   p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
   memset(old_page_ptr, 0 , PAGE_SIZE);
 }
-
-// void swapPage(){
-//
-// }
 
 //Look through page table to find it's pages in regular memory, or in the swap file. If both are full then no more pages can be given out
 void movePagesToFront(tcb* thread, void* page_fault){
@@ -166,6 +170,7 @@ void swapEmptyFile(int old_page, int new_page){
 
 
 }
+
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
   sigset_t a,b;
   if(threadreq != 0){
@@ -246,6 +251,13 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   mem_entry* temp;
   mem_entry* next;
 
+  int did_segfault;
+  if(head != NULL){ //This will trigger a segfault if page is mprotected
+    if(head->size == 0){
+      did_segfault = 0;
+    }
+  }
+
   if(!malloc_init){ //This should actually happen to each thread! Must fix
     int i = requestPage();
     head = (mem_entry*)&mem[PAGE_SIZE*USER_PAGE_START]; //points to beginning of user space in mem
@@ -319,8 +331,8 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
 int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   //sigset_t a,b;
 	//sigemptyset(&a);
-//	sigaddset(&a, SIGPROF);
-//	sigprocmask(SIG_BLOCK, &a, &b);
+  //	sigaddset(&a, SIGPROF);
+  //	sigprocmask(SIG_BLOCK, &a, &b);
   if(item == NULL){
     //sigprocmask(SIG_SETMASK, &b, NULL);
     return -1; //Free failed; cannot free null pointer
@@ -436,11 +448,11 @@ void* shalloc(size_t size){
       temp->next = next;
       temp->size = size;
       temp->available = 0;
-    //  sigprocmask(SIG_SETMASK, &b, NULL);
+      //  sigprocmask(SIG_SETMASK, &b, NULL);
       return(char*)temp+sizeof(mem_entry);
     }
   }
-//  sigprocmask(SIG_SETMASK, &b, NULL);
+  //  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 
 //Unprotect previous context, protect next context
@@ -452,15 +464,21 @@ void swapMem(tcb* prev, tcb* next){
   int i;
   for(i = 0; i < SHALLOC_PAGE_START; i++){
     if(p_dir->pages[i].owner == prev){
-      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)), PROT_NONE);
-      mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
     }
     else if(p_dir->pages[i].owner == next){
-      mprotect(&mem[i*PAGE_SIZE + CONTEXT_START * PAGE_SIZE + sizeof(context_directory)], (64000 + sizeof(tcb) + sizeof(ucontext_t)),  PROT_READ | PROT_WRITE);
-      mprotect(&mem[i*PAGE_SIZE + USER_PAGE_START * PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+
+      mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+    }
+
+    if(c_dir->contexts[i].owner == prev){
+      mprotect(c_dir->contexts[i].start, (64000 + sizeof(tcb) + sizeof(ucontext_t)), PROT_NONE);
+    }
+    else if(c_dir->contexts[i].owner == next){
+      mprotect(c_dir->contexts[i].start, (64000 + sizeof(tcb) + sizeof(ucontext_t)),  PROT_READ | PROT_WRITE);
     }
   }
-//  sigprocmask(SIG_SETMASK, &b, NULL);
+  //  sigprocmask(SIG_SETMASK, &b, NULL);
 }
 /*
 int main(){
