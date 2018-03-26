@@ -16,6 +16,7 @@
 int init = 0;
 int malloc_init = 0;
 int shalloc_init = 0;
+int did_segfault = 0;
 int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
@@ -24,7 +25,7 @@ int swap;
    int page_fault_num = getCurrentPage((void*)si->si_addr);
    page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
 
-   movePagesToFront(root, page_ptr_cause);
+   movePagesToFront(root, page_fault_num);
    return;
  }
 
@@ -132,7 +133,7 @@ int getCurrentPage(void* ptr){ //Given a pointer return what page it's located i
   return displacement/PAGE_SIZE;
 }
 
-/* Swaps page that is full with empty */
+/* Swaps page that is full with empty page */
 void swapEmptyPage(int old_page, int new_page){
   void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
@@ -142,19 +143,37 @@ void swapEmptyPage(int old_page, int new_page){
   memset(old_page_ptr, 0 , PAGE_SIZE);
 }
 
+/* Swaps two pages that are both taken*/
+void swapPage(int old_page, int new_page){
+
+}
+
 //Look through page table to find it's pages in regular memory, or in the swap file. If both are full then no more pages can be given out
-void movePagesToFront(tcb* thread, void* page_fault){
+void movePagesToFront(tcb* curr_thread, int page_fault_num){
+  int foundPageForCurr = 0;
+
   int i;
   for(i = USER_PAGE_START; i < NUM_PAGES; i++){
     if(i >= SHALLOC_PAGE_START && i < 2049){ //These are shalloc pages; Leave them alone!
       continue;
     }
-    if(p_dir->pages[i].owner == thread){
+    if(p_dir->pages[i].owner == curr_thread){ //Found page belonging to current thread
+      // foundPageForCurr = 1;
       // mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
       // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
       // swapPage(curr_page+1, p_num);
       // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
     }
+  }
+
+  if(!foundPageForCurr){ //Couldn't find page for current thread, must be new thread
+    malloc_init = 0;
+    did_segfault = 1;
+    int free_page_num = requestPage();
+    mprotect(&mem[free_page_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+    mprotect(&mem[page_fault_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+    swapEmptyPage(page_fault_num, free_page_num);
+    mprotect(&mem[free_page_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
   }
 }
 
@@ -251,9 +270,8 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   mem_entry* temp;
   mem_entry* next;
 
-  int did_segfault;
   if(head != NULL){ //This will trigger a segfault if page is mprotected
-    if(head->size == 0){
+    if(did_segfault || head->size == 0){
       did_segfault = 0;
     }
   }
