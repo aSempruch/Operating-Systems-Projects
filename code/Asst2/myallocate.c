@@ -23,8 +23,8 @@ int swap;
    printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
    void* page_ptr_cause;
    int page_fault_num = getCurrentPage((void*)si->si_addr);
+   printf("Page belongs to %d\n", (int)p_dir->pages[page_fault_num].owner);
    page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
-
    movePagesToFront(root, page_fault_num);
    return;
  }
@@ -133,21 +133,73 @@ int getCurrentPage(void* ptr){ //Given a pointer return what page it's located i
   return displacement/PAGE_SIZE;
 }
 
+void setMemEntryPtrs(int old_page, int new_page){
+  if(old_page < USER_PAGE_START || old_page > NUM_PAGES || new_page < USER_PAGE_START || new_page > NUM_PAGES){
+    return;
+  }
+
+  if(p_dir->pages[old_page].head == NULL){
+    return;
+  }
+
+  // memcpy(&mem[new_page*PAGE_SIZE], p_dir->pages[old_page].head, sizeof(mem_entry));
+  p_dir->pages[new_page].head = (mem_entry*)&mem[new_page*PAGE_SIZE];
+  mem_entry* curr = p_dir->pages[new_page].head;
+  // mem_entry* curr_old = p_dir->pages[old_page].head->next;
+  // mem_entry* prev_new = p_dir->pages[new_page].head;
+  while(curr->next != NULL){
+    curr->next = (mem_entry*)curr+curr->size+sizeof(mem_entry);
+    // next = (mem_entry*)((char*)temp+sizeof(mem_entry)+size);    //Create header for next block
+    // memcpy(prev_new+sizeof(mem_entry)+prev_new->size, curr_old, sizeof(mem_entry));
+    // prev_new->next = next;
+  }
+}
+
 /* Swaps page that is full with empty page */
 void swapEmptyPage(int old_page, int new_page){
   void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
   memcpy(new_page_ptr, old_page_ptr, PAGE_SIZE);
-  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  p_dir->pages[new_page].head = (mem_entry*)&mem[new_page*PAGE_SIZE];
   p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
   memset(old_page_ptr, 0 , PAGE_SIZE);
 }
 
 /* Swaps two pages that are both taken*/
 void swapPage(int old_page, int new_page){
+  void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
+  void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
+  void* temp_page_ptr = (void*)&mem[TEMP_PAGE*PAGE_SIZE];
+  memcpy(old_page_ptr, temp_page_ptr, PAGE_SIZE);
+  //  p_dir->pages[old_page].head = p_dir->pages[TEMP_PAGE].head;
+  //  p_dir->pages[old_page].owner = p_dir->pages[TEMP_PAGE].owner;
+
+  memcpy(new_page_ptr, old_page_ptr, PAGE_SIZE);
+  //  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  //  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+
+  memcpy(temp_page_ptr, new_page_ptr, PAGE_SIZE);
+  //  p_dir->pages[TEMP_PAGE].head = p_dir->pages[new_page].head;
+  //  p_dir->pages[TEMP_PAGE].owner = p_dir->pages[new_page].owner;
 
 }
+void swapPageFile(int old_page, int new_page){
+  lseek(swap, (new_page*PAGE_SIZE - MEM_SIZE), SEEK_SET);
+  void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
+  void* temp_page_ptr = (void*)&mem[TEMP_PAGE*PAGE_SIZE];
 
+  read(swap, temp_page_ptr, PAGE_SIZE);
+  //  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  //  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+  lseek(swap, (new_page*PAGE_SIZE - MEM_SIZE), SEEK_SET);
+  write(swap, old_page_ptr, PAGE_SIZE);
+  //  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
+  //  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+  memcpy(temp_page_ptr, old_page_ptr, PAGE_SIZE);
+  lseek(swap, 0, SEEK_SET);
+  memset(old_page_ptr, 0 , PAGE_SIZE);
+
+}
 //Look through page table to find it's pages in regular memory, or in the swap file. If both are full then no more pages can be given out
 void movePagesToFront(tcb* curr_thread, int page_fault_num){
   int foundPageForCurr = 0;
@@ -158,11 +210,16 @@ void movePagesToFront(tcb* curr_thread, int page_fault_num){
       continue;
     }
     if(p_dir->pages[i].owner == curr_thread){ //Found page belonging to current thread
-      // foundPageForCurr = 1;
-      // mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-      // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-      // swapPage(curr_page+1, p_num);
-      // mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+       foundPageForCurr = 1;
+       mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+       mprotect(&mem[page_fault_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+       /*
+       In reality this should actually get the page place that corresponds to the page that faulted.
+       So if the page that faulted was 1003 I should get the 3rd page place. For now testing when
+       each thread has one page each.
+       */
+       swapPage(page_fault_num, i);
+       mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
     }
   }
 
@@ -175,6 +232,7 @@ void movePagesToFront(tcb* curr_thread, int page_fault_num){
     swapEmptyPage(page_fault_num, free_page_num);
     mprotect(&mem[free_page_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
   }
+
 }
 
 void swapEmptyFile(int old_page, int new_page){

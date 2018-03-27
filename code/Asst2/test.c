@@ -10,17 +10,21 @@ void *test2(void *arg){
 	printf("2\n");
 	int *x = malloc(sizeof(int));
 	*x = 12;
-	while(1){}
+	while(1){
+		printf("%d\n",*x);
+	}
 }
 
 void *test3(void *arg){
 	printf("3\n");
-  int *z = malloc(sizeof(int));
+	int *z = malloc(sizeof(int));
 	*z = 18;
 	//sigset_t b;
 	//sigemptyset(&b);
 	//sigprocmask(SIG_SETMASK, &b, NULL);
-	while(1){}
+	while(1){
+		//printf("%d\n",*z);
+	}
 }
 
 my_pthread_mutex_t mutex;
