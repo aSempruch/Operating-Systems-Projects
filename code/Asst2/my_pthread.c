@@ -21,7 +21,6 @@ ucontext_t create;
 /* create a new thread */
 ucontext_t * exitCon;
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
-	new_count++;
 	sigset_t a,b;
 	sigemptyset(&a);
 	sigaddset(&a, SIGALRM);
@@ -333,15 +332,20 @@ int updatePrior(tcb* thread, int prior){
 			root = root->next;
 			curr = root;
 			prev = ptr;
-			while(curr != NULL){
+			while(curr != NULL){ //This is stupid -___- fix this
 				if(curr->prior < ptr->prior){
 					prev->next = ptr;
 					ptr->next = curr;
+					return 0;
 				} else {
 					prev = curr;
 					curr = curr->next;
 				}
 			}
+			//If I get to end
+			prev->next = ptr;
+			ptr->next = NULL;
+			return 0;
 		}
 	}
 

@@ -169,17 +169,19 @@ void swapPage(int old_page, int new_page){
   void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
   void* temp_page_ptr = (void*)&mem[TEMP_PAGE*PAGE_SIZE];
-  memcpy(old_page_ptr, temp_page_ptr, PAGE_SIZE);
-  //  p_dir->pages[old_page].head = p_dir->pages[TEMP_PAGE].head;
-  //  p_dir->pages[old_page].owner = p_dir->pages[TEMP_PAGE].owner;
+  memcpy(temp_page_ptr, old_page_ptr, PAGE_SIZE); //old into temp
+  setMemEntryPtrs(old_page, TEMP_PAGE);
+  p_dir->pages[TEMP_PAGE].owner = p_dir->pages[old_page].owner;
 
-  memcpy(new_page_ptr, old_page_ptr, PAGE_SIZE);
-  //  p_dir->pages[new_page].head = p_dir->pages[old_page].head;
-  //  p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+  memcpy(old_page_ptr, new_page_ptr, PAGE_SIZE); //new into old
+  setMemEntryPtrs(new_page_ptr, old_page_ptr);
+  p_dir->pages[old_page].owner = p_dir->pages[new_page].owner;
 
-  memcpy(temp_page_ptr, new_page_ptr, PAGE_SIZE);
-  //  p_dir->pages[TEMP_PAGE].head = p_dir->pages[new_page].head;
-  //  p_dir->pages[TEMP_PAGE].owner = p_dir->pages[new_page].owner;
+  memcpy(new_page_ptr, temp_page_ptr, PAGE_SIZE); //temp into new
+  setMemEntryPtrs(temp_page_ptr, new_page_ptr);
+  p_dir->pages[new_page].owner = p_dir->pages[TEMP_PAGE].owner;
+
+
 
 }
 void swapPageFile(int old_page, int new_page){
@@ -537,6 +539,11 @@ void swapMem(tcb* prev, tcb* next){
 	sigemptyset(&a);
 	sigaddset(&a, SIGPROF);
 	sigprocmask(SIG_BLOCK, &a, &b);
+
+  if(prev == next){
+    return;
+  }
+
   int i;
   for(i = USER_PAGE_START; i < SHALLOC_PAGE_START; i++){
     if(p_dir->pages[i].owner == prev){

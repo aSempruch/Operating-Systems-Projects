@@ -19,11 +19,8 @@ void *test3(void *arg){
 	printf("3\n");
 	int *z = malloc(sizeof(int));
 	*z = 18;
-	//sigset_t b;
-	//sigemptyset(&b);
-	//sigprocmask(SIG_SETMASK, &b, NULL);
 	while(1){
-		//printf("%d\n",*z);
+		printf("%d\n",*z);
 	}
 }
 
