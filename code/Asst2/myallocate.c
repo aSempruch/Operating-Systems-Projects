@@ -20,7 +20,7 @@ int did_segfault = 0;
 int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
-   printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
+   printf("Got SIGSEGV at address: 0x%lx\n",(void*)si->si_addr);
    void* page_ptr_cause;
    int page_fault_num = getCurrentPage((void*)si->si_addr);
    printf("Page that it segaulted %d\n", page_fault_num);
@@ -342,6 +342,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
     malloc_init = 1;
     p_dir->pages[USER_PAGE_START].head = head;
     p_dir->pages[USER_PAGE_START].owner = root;
+    p_dir->pages[USER_PAGE_START].available = 0;
   }
 
   temp = head;

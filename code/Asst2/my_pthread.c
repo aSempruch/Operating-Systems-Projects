@@ -17,7 +17,6 @@
 #include<sys/time.h>
 #define MEM 64000
 ucontext_t create;
-int new_count = 0;
 
 /* create a new thread */
 ucontext_t * exitCon;
@@ -27,7 +26,6 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	sigemptyset(&a);
 	sigaddset(&a, SIGALRM);
 	sigprocmask(SIG_BLOCK, &a, &b);
-	printf("I'm creating a thread!\n");
 	short isFirst = 0;
 	if(root == NULL){
 		isFirst = 1;
@@ -98,10 +96,6 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	}
 	sigemptyset(&b);
 	sigprocmask(SIG_SETMASK, &b, NULL);
-	printf("I finished making a thread!\n");
-	if(new_count == 2){
-		printf("count is 2\n");
-	}
 	return 0;
 }
 
