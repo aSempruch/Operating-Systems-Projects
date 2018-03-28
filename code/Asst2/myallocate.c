@@ -161,7 +161,7 @@ void swapEmptyPage(int old_page, int new_page){
   setMemEntryPtrs(old_page, new_page);
   p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
   memset(old_page_ptr, 0 , PAGE_SIZE);
-  p_dir->pages[old_page].available = 1;
+  // p_dir->pages[old_page].available = 1; //Why the hell did I do this
 }
 
 /* Swaps two pages that are both taken */
@@ -348,12 +348,16 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
   }
 
   temp = head;
-  int curr_page = getCurrentPage((void*)temp);
+  int curr_page;
   while(temp != NULL){
-    if(temp->available != 1 || temp->size < size){
+    if(temp->available != 1){
+      temp = temp->next;
+    }
+    else if(temp->size < size && temp->next != NULL){
       temp = temp->next;
     }
     else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
+      curr_page = getCurrentPage((void*)temp);
       int p_num = requestPage();
       if(p_num == -1){ //No more pages available
         int p_num = requestSwap();
@@ -415,6 +419,27 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
     sigprocmask(SIG_SETMASK, &b, NULL);
     return -1; //Free failed; cannot free null pointer
   }
+
+
+  if(threadreq == 0){
+	int j;
+	if(item > c_dir){
+		for(j = 0; j < NUM_CONTEXTS; j++){
+			if(c_dir->contexts[j].owner == (tcb*) item){
+				c_dir->contexts[j].available = 1;
+			}
+		}
+	}
+	else{
+		//tcb* owner = (my_pthread_mutex_t*)item->head;
+		int index = ((int)(item - ((void*)m_dir + sizeof(mutex_directory)))) / sizeof(my_pthread_mutex_t);
+		m_dir->mutexes[index].available = 1;
+	}
+	return;
+  }
+
+
+
 
   mem_entry* head = p_dir->pages[1001].head;
   mem_entry* curr = head;

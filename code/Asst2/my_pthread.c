@@ -134,11 +134,11 @@ void my_pthread_exit(void *value_ptr) {
 	}
 
 
-	free(exitThread->thread->uc_stack.ss_sp);
+	//free(exitThread->thread->uc_stack.ss_sp);
 	tcb* temp = exitThread;
 	removeFromQueue(exitThread);
-	free(temp->thread);
-	free(temp);
+	//free(temp->thread);
+	mydeallocate(temp, __FILE_,__LINE__, 0);
 
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	setcontext(root->thread);
@@ -258,8 +258,8 @@ int my_pthread_mutex_unlock(my_pthread_mutex_t *mutex) {
 /* destroy the mutex */
 int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	my_pthread_mutex_unlock(mutex);
-	free(mutex->attr);
-	free(mutex);
+//	free(mutex->attr);
+	mydeallocate(mutex, __FILE__,__LINE__, 0);
 	return 0;
 }
 
@@ -332,7 +332,7 @@ int updatePrior(tcb* thread, int prior){
 			root = root->next;
 			curr = root;
 			prev = ptr;
-			while(curr != NULL){ //This is stupid -___- fix this
+			while(curr != NULL){
 				if(curr->prior < ptr->prior){
 					prev->next = ptr;
 					ptr->next = curr;
@@ -353,6 +353,7 @@ int updatePrior(tcb* thread, int prior){
 		parent->next = ptr->next;
 		ptr->next = root;
 		root = ptr;
+		return 0;
 	}
 
 	while(curr != NULL){
@@ -360,6 +361,7 @@ int updatePrior(tcb* thread, int prior){
 			parent->next = ptr->next;
 			prev->next = ptr;
 			ptr->next = curr;
+			return;
 		} else {
 			prev = curr;
 			curr = curr->next;

@@ -18,6 +18,7 @@ void *test2(void *arg){
 	// }
 
 	x = (char*)malloc(5000);
+	*x = 'x';
 	while(1){
 		printf("%c\n",*x);
 	}
@@ -34,8 +35,9 @@ void *test3(void *arg){
 	// }
 
 	z = (char*)malloc(5000);
+	*z = 'z';
 	while(1){
-		printf("%d\n",*z);
+		printf("%c\n",*z);
 	}
 }
 
