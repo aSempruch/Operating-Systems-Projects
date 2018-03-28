@@ -174,11 +174,11 @@ void swapPage(int old_page, int new_page){
   p_dir->pages[TEMP_PAGE].owner = p_dir->pages[old_page].owner;
 
   memcpy(old_page_ptr, new_page_ptr, PAGE_SIZE); //new into old
-  setMemEntryPtrs(new_page_ptr, old_page_ptr);
+  setMemEntryPtrs(new_page, old_page);
   p_dir->pages[old_page].owner = p_dir->pages[new_page].owner;
 
   memcpy(new_page_ptr, temp_page_ptr, PAGE_SIZE); //temp into new
-  setMemEntryPtrs(temp_page_ptr, new_page_ptr);
+  setMemEntryPtrs(TEMP_PAGE, new_page);
   p_dir->pages[new_page].owner = p_dir->pages[TEMP_PAGE].owner;
 
 
@@ -612,13 +612,10 @@ int main(){
 
   //Attempt to saturate the memory for small blocks
   printf("Attempting to saturate memory.\n");
-  int increment;
-  for(increment = 0; increment < 1000; increment = increment + sizeof(int)){
-    if(increment == 4176){
-      printf("Reached point where should be saturated\n");
-    }
+  int i;
+  for(i = 0; i < 1000; i++){
 
-    int* s = (int*) malloc(sizeof(int));
+    char* s = (char*) malloc(200);
 
     if(s == NULL){
       printf("Memory saturated, returned null pointer!\n");

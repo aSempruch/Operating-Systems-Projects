@@ -77,6 +77,8 @@ context_directory *c_dir;
 mutex_directory *m_dir;
 
 int requestPage();
+void createSwap();
+void movePagesToFront(tcb* curr_thread, int page_fault_num);
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq);
 int mydeallocate(void* item, char* file, unsigned int line, int threadreq);
 void* shalloc(size_t size);

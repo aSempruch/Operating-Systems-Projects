@@ -8,17 +8,32 @@ int* y;
 
 void *test2(void *arg){
 	printf("2\n");
-	int *x = malloc(sizeof(int));
-	*x = 12;
+	// int *x = malloc(sizeof(int));
+	// *x = 12;
+
+	char* x;
+	int i;
+	// for(i = 0; i < 17; i++){
+	// 	x = (char*)malloc(200);
+	// }
+
+	x = (char*)malloc(5000);
 	while(1){
-		printf("%d\n",*x);
+		printf("%c\n",*x);
 	}
 }
 
 void *test3(void *arg){
 	printf("3\n");
-	int *z = malloc(sizeof(int));
-	*z = 18;
+	// int *z = malloc(sizeof(int));
+	// *z = 18;
+	char* z;
+	// int i;
+	// for(i = 0; i < 17; i++){
+	// 	z = (char*)malloc(200);
+	// }
+
+	z = (char*)malloc(5000);
 	while(1){
 		printf("%d\n",*z);
 	}
