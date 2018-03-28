@@ -21,10 +21,14 @@ int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
    printf("Got SIGSEGV at address: 0x%lx\n",(void*)si->si_addr);
-   void* page_ptr_cause;
    int page_fault_num = getCurrentPage((void*)si->si_addr);
    printf("Page that it segaulted %d\n", page_fault_num);
-   page_ptr_cause = (void*)&mem[page_fault_num*PAGE_SIZE];
+
+   //The page that faulted belongs to current thread, so they must need the next page too
+   if(p_dir->pages[page_fault_num].owner == root){
+     page_fault_num++;
+   }
+
    movePagesToFront(root, page_fault_num);
    return;
  }
@@ -158,10 +162,10 @@ void swapEmptyPage(int old_page, int new_page){
   void* old_page_ptr = (void*)&mem[old_page*PAGE_SIZE];
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
   memcpy(new_page_ptr, old_page_ptr, PAGE_SIZE);
-  setMemEntryPtrs(old_page, new_page);
+  // setMemEntryPtrs(old_page, new_page); // Does this even matter?
   p_dir->pages[new_page].owner = p_dir->pages[old_page].owner;
+  p_dir->pages[new_page].place = p_dir->pages[old_page].place;
   memset(old_page_ptr, 0 , PAGE_SIZE);
-  // p_dir->pages[old_page].available = 1; //Why the hell did I do this
 }
 
 /* Swaps two pages that are both taken */
@@ -170,15 +174,15 @@ void swapPage(int old_page, int new_page){
   void* new_page_ptr = (void*)&mem[new_page*PAGE_SIZE];
   void* temp_page_ptr = (void*)&mem[TEMP_PAGE*PAGE_SIZE];
   memcpy(temp_page_ptr, old_page_ptr, PAGE_SIZE); //old into temp
-  setMemEntryPtrs(old_page, TEMP_PAGE);
+  p_dir->pages[TEMP_PAGE].place = p_dir->pages[old_page].place;
   p_dir->pages[TEMP_PAGE].owner = p_dir->pages[old_page].owner;
 
   memcpy(old_page_ptr, new_page_ptr, PAGE_SIZE); //new into old
-  setMemEntryPtrs(new_page, old_page);
+  p_dir->pages[old_page].place = p_dir->pages[new_page].place;
   p_dir->pages[old_page].owner = p_dir->pages[new_page].owner;
 
   memcpy(new_page_ptr, temp_page_ptr, PAGE_SIZE); //temp into new
-  setMemEntryPtrs(TEMP_PAGE, new_page);
+  p_dir->pages[new_page].place = p_dir->pages[TEMP_PAGE].place;
   p_dir->pages[new_page].owner = p_dir->pages[TEMP_PAGE].owner;
 
 
@@ -210,17 +214,21 @@ void movePagesToFront(tcb* curr_thread, int page_fault_num){
     if(i >= SHALLOC_PAGE_START && i < 2049){ //These are shalloc pages; Leave them alone!
       continue;
     }
+
     if(p_dir->pages[i].owner == curr_thread){ //Found page belonging to current thread
-       foundPageForCurr = 1;
-       mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-       mprotect(&mem[page_fault_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-       /*
-       In reality this should actually get the page place that corresponds to the page that faulted.
-       So if the page that faulted was 1003 I should get the 3rd page place. For now testing when
-       each thread has one page each.
-       */
-       swapPage(page_fault_num, i);
-       mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+      int placeNeeded = page_fault_num - USER_PAGE_START;
+      foundPageForCurr = 1;
+      if(placeNeeded == p_dir->pages[i].place){
+        mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+        mprotect(&mem[page_fault_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+        /*
+        In reality this should actually get the page place that corresponds to the page that faulted.
+        So if the page that faulted was 1003 I should get the 3rd page place. For now testing when
+        each thread has one page each.
+        */
+        swapPage(page_fault_num, i);
+        mprotect(&mem[i*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+      }
     }
   }
 
@@ -251,11 +259,9 @@ void swapEmptyFile(int old_page, int new_page){
 
 void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq){
   sigset_t a,b;
-  if(threadreq != 0){
-  	sigemptyset(&a);
-  	sigaddset(&a, SIGPROF);
-  	sigprocmask(SIG_BLOCK, &a, &b);
-  }
+  sigemptyset(&a);
+  sigaddset(&a, SIGPROF);
+  sigprocmask(SIG_BLOCK, &a, &b);
   if(!init){
     initialize();
   }
@@ -295,12 +301,12 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
           return (c_dir->contexts[i].start);
         }
         if(size == sizeof(tcb)){
-         sigprocmask(SIG_SETMASK, &b, NULL);
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start + sizeof(ucontext_t));
         }
         if(size == sizeof(my_pthread_t)){
           c_dir->contexts[i].available = 0;
-         sigprocmask(SIG_SETMASK, &b, NULL);
+          sigprocmask(SIG_SETMASK, &b, NULL);
           return (c_dir->contexts[i].start + sizeof(ucontext_t) + sizeof(tcb));
         }
       }
@@ -310,7 +316,7 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       }
       if(size == sizeof(tcb)){
 	      c_dir->contexts[i].available = 0;
-       sigprocmask(SIG_SETMASK, &b, NULL);
+        sigprocmask(SIG_SETMASK, &b, NULL);
         return (c_dir->contexts[i].start + sizeof(ucontext_t));
       }
       if(size == 64000){
@@ -386,7 +392,6 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       p_dir->pages[curr_page+1].owner = p_dir->pages[curr_page].owner;
       p_dir->pages[curr_page+1].place = p_dir->pages[curr_page].place+1;
       temp->size += PAGE_SIZE;
-      sigprocmask(SIG_SETMASK, &b, NULL);
       continue;
     }
     else{
