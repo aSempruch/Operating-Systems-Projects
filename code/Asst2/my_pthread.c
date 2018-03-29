@@ -138,7 +138,7 @@ void my_pthread_exit(void *value_ptr) {
 	tcb* temp = exitThread;
 	removeFromQueue(exitThread);
 	//free(temp->thread);
-	mydeallocate(temp, __FILE_,__LINE__, 0);
+	mydeallocate(temp, __FILE__,__LINE__, 0);
 
 	sigprocmask(SIG_SETMASK, &b, NULL);
 	setcontext(root->thread);

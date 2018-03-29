@@ -34,10 +34,14 @@ int main(int argc, char* argv[]){
 void testFunc(int rank){
 	if(verbose == 1)
 			printf("Thread %d is mallocing %d bytes\n", rank, num_bytes);
-	int* x = malloc(num_bytes);
+	char* x = malloc(num_bytes);
 	if(verbose == 1)
 			printf("Thread %d malloc succesful\n", rank);
-	*x = rank;
+	int k;
+	if(verbose == 1)
+			printf("Thread %d filling up object\n", rank);
+	for(k = 0; k < num_bytes; k++)
+			*(x+k) = 'X';
 	free(x);
 	if(verbose == 1)
 			printf("Thread %d free succesful\n", rank);
