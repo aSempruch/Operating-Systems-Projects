@@ -367,8 +367,15 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
       temp = temp->next;
     }
     else if(temp->size < size+sizeof(mem_entry)){    //Last block case; No space left after
+      int pages_needed = 1;
+
+      if(size > temp->size+PAGE_SIZE){ // Holy Uncanny Photographic Mental Processes Batman! We need more than one page!
+        pages_needed = ((size-temp->size)/PAGE_SIZE)+1;
+      }
+
       curr_page = getCurrentPage((void*)temp);
       int p_num = requestPage();
+
       if(p_num == -1){ //No more pages available
         int p_num = requestSwap();
         if(p_num == -1){
@@ -378,24 +385,41 @@ void* myallocate(unsigned int size, char* file, unsigned int line, int threadreq
         }
         else{
 
-            mprotect(&mem[(curr_page+1)*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-            swapEmptyFile(curr_page+1, p_num);
+            //mprotect(&mem[(curr_page+1)*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+            //swapEmptyFile(curr_page+1, p_num);
             //mprotect(&mem[curr_page+1*PAGE_SIZE], PAGE_SIZE,  PROT_NONE);
-            p_num = curr_page+1;
+            //p_num = curr_page+1;
         }
       }
 
+      while(pages_needed > 0){
+        if(p_num > NUM_PAGES){
+          mprotect(&mem[(curr_page+1)*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+          swapEmptyFile(curr_page+1, p_num);
+        }
+        else if(curr_page != (p_num-1)){ //Pages are not next to each other, gotta swap pages
+          mprotect(&mem[(curr_page+1)*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+          mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
+          swapEmptyPage(curr_page+1, p_num);
+          mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+        }
+        p_dir->pages[curr_page+1].head = head;
+        p_dir->pages[curr_page+1].owner = p_dir->pages[curr_page].owner;
+        p_dir->pages[curr_page+1].place = p_dir->pages[curr_page].place+1;
+        temp->size += PAGE_SIZE;
+        pages_needed--;
 
-      if(curr_page != (p_num-1)){ //Pages are not next to each other, gotta swap pages
-        mprotect(&mem[(curr_page+1)*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-        mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE,  PROT_READ | PROT_WRITE);
-        swapEmptyPage(curr_page+1, p_num);
-        mprotect(&mem[p_num*PAGE_SIZE], PAGE_SIZE, PROT_NONE);
+        if(pages_needed > 0){
+          curr_page++;
+          p_num = requestPage();
+          if(p_num == -1){
+            p_num = requestSwap();
+          }
+          if(p_num == -1){
+            return NULL;
+          }
+        }
       }
-      p_dir->pages[curr_page+1].head = head;
-      p_dir->pages[curr_page+1].owner = p_dir->pages[curr_page].owner;
-      p_dir->pages[curr_page+1].place = p_dir->pages[curr_page].place+1;
-      temp->size += PAGE_SIZE;
       continue;
     }
     else{
@@ -437,14 +461,14 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   				c_dir->contexts[j].available = 1;
   			}
   		}
-      //for(j = 0; j < NUM_PAGES; j++){
-        // if(p_dir->pages[j].owner == (tcb*) item){
-      //     p_dir->pages[j].available = 1;
-      //     if(j < SHALLOC_PAGE_START){
-      //         memset(mem[(p_dir->pages[j].start_index)], 0 , PAGE_SIZE);
-      //     }
-      //   }
-      // }
+      for(j = 0; j < NUM_PAGES; j++){
+        if(p_dir->pages[j].owner == (tcb*) item){
+          p_dir->pages[j].available = 1;
+          //if(j < SHALLOC_PAGE_START){
+        //      memset(mem[(p_dir->pages[j].start_index)], 0 , PAGE_SIZE);
+      //    }
+        }
+      }
   	} else {
   		//tcb* owner = (my_pthread_mutex_t*)item->head;
   		int index = ((int)(item - ((void*)m_dir + sizeof(mutex_directory)))) / sizeof(my_pthread_mutex_t);
@@ -452,8 +476,6 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   	}
   	return;
   }
-
-
 
 
   mem_entry* head = p_dir->pages[1001].head;
