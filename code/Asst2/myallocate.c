@@ -118,7 +118,7 @@ int requestPage(){
 /* Returns index of the first available page in our swap file */
 int requestSwap(){
   int i;
-  for(i = REAL_PAGES; i< NUM_PAGES; i++){
+  for(i = REAL_PAGES+1; i< NUM_PAGES; i++){
     if(p_dir->pages[i].available == 1){
       p_dir->pages[i].available = 0;
       break;

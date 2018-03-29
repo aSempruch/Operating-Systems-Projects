@@ -5,16 +5,18 @@
 
 void testFunc(int rank);
 int num_bytes;
+int num_calls;
 int verbose;
 
 int main(int argc, char* argv[]){
-	if(argc < 3){
+	if(argc < 4){
 		printf("Wrong number of agruments dumbey\n");
 		exit(0);
 	}
 	int num_threads = atoi(argv[1]);
 	num_bytes = atoi(argv[2]);
-	if(argc > 3 && *(argv[3]) == 'v')
+	num_calls = atoi(argv[3]);
+	if(argc > 4 && *(argv[4]) == 'v')
 		verbose = 1;
 	else
 		verbose = 0;
@@ -34,15 +36,20 @@ int main(int argc, char* argv[]){
 void testFunc(int rank){
 	if(verbose == 1)
 			printf("Thread %d is mallocing %d bytes\n", rank, num_bytes);
-	char* x = malloc(num_bytes);
+	int k, y;
+	char** obj = malloc(num_calls);
+	for(k = 0; k < num_calls; k++)
+		*(obj+k) = malloc(num_bytes);
 	if(verbose == 1)
 			printf("Thread %d malloc succesful\n", rank);
-	int k;
 	if(verbose == 1)
 			printf("Thread %d filling up object\n", rank);
-	for(k = 0; k < num_bytes; k++)
-			*(x+k) = 'X';
-	free(x);
+	for(y = 0; y < num_calls; y++)
+		for(k = 0; k < num_bytes; k++)
+				*(*(obj+y)+k) = 'X';
+
+	for(k = 0; k < num_calls; k++)
+		free(*(obj+k));
 	if(verbose == 1)
 			printf("Thread %d free succesful\n", rank);
 }
