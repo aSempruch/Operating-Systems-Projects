@@ -11,12 +11,20 @@ void *test2(void *arg){
 	char* x;
 	char* a;
 	x = (char*)malloc(5000);
-	a = (char*)malloc(5000);
+
+	char str[] = "------------------------------------------------------------\
+								I'm gonna initialize and create this long ass string cause ye\
+								------------------------------------------------------------";
+	int i;
+	for(i = 0; i < 5000; i += strlen(str)+1){
+		a = (char*)malloc(strlen(str)+1);
+		strncpy(a, str, strlen(str)+1);
+	}
+
 	*x = 'x';
-	*a = 'a';
 	while(1){
 		printf("%c\n",*x);
-		printf("%c\n",*a);
+		printf("%s\n",a);
 	}
 }
 
@@ -25,12 +33,20 @@ void *test3(void *arg){
 	char* z;
 	char* b;
 	z = (char*)malloc(5000);
-	b = (char*)malloc(5000);
+
+	char str[] = "------------------------------------------------------------\
+								I'm gonna initialize and create this long ass string cause ye\
+								------------------------------------------------------------";
+	int i;
+	for(i = 0; i < 5000; i += strlen(str)+1){
+		b = (char*)malloc(strlen(str)+1);
+		strncpy(b, str, strlen(str)+1);
+	}
+
 	*z = 'z';
-	*b = 'b';
 	while(1){
 		printf("%c\n",*z);
-		printf("%c\n",*b);
+		printf("%s\n",b);
 	}
 }
 
