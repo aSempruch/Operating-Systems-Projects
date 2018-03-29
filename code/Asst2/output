@@ -1,43 +1,34 @@
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
-Got SIGSEGV at address: 0x7efea1648018
-Before GCP
-Page belongs to -1590872400
+(gdb) watch root
+Hardware watchpoint 1: root
+(gdb) run 1 1 2
+Starting program: /ilab/users/as2322/github/OS-Project_1/code/Asst2/extremetest 1 1 2
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+Number of threads: 1
+Allocation size: 1
+Running init
+Hardware watchpoint 1: root
+
+Old value = (tcb *) 0x0
+New value = (tcb *) 0x7ffff6d6d6b0
+my_pthread_create (thread=0x7fffffffe120, attr=0x0, function=0x400d42 <testFunc>, arg=0x0) at my_pthread.c:68
+68              if(root->next != NULL){
+(gdb) c
+Continuing.
+Hardware watchpoint 1: root
+
+Old value = (tcb *) 0x7ffff6d6d6b0
+New value = (tcb *) 0x7ffff6d7d490
+my_pthread_create (thread=0x7fffffffe120, attr=0x0, function=0x400d42 <testFunc>, arg=0x0) at my_pthread.c:93
+93                      startScheduler();
+(gdb) c
+Continuing.
+Hardware watchpoint 1: root
+
+Old value = (tcb *) 0x7ffff6d7d490
+New value = (tcb *) 0x7ffff6d6d6b0
+removeFromQueue (thread=0x7ffff6d7d490) at my_pthread.c:377
+377                     return 0;
+(gdb) c
+Continuing.
+[Inferior 1 (process 10043) exited with code 01]

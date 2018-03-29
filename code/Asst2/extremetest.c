@@ -47,7 +47,8 @@ void testFunc(int rank){
 	for(y = 0; y < num_calls; y++)
 		for(k = 0; k < num_bytes; k++)
 				*(*(obj+y)+k) = 'X';
-
+	if(verbose == 1)
+		printf("Thread %d attempting to free\n");
 	for(k = 0; k < num_calls; k++)
 		free(*(obj+k));
 	if(verbose == 1)

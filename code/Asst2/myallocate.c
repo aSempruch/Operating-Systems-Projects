@@ -20,9 +20,9 @@ int did_segfault = 0;
 int swap;
 
  static void seghandler(int sig, siginfo_t *si, void *unused){
-   printf("Got SIGSEGV at address: 0x%lx\n",(void*)si->si_addr);
+   // printf("Got SIGSEGV at address: 0x%lx\n",(void*)si->si_addr);
    int page_fault_num = getCurrentPage((void*)si->si_addr);
-   printf("Page that it segaulted %d\n", page_fault_num);
+   // printf("Page that it segaulted %d\n", page_fault_num);
 
    //The page that faulted belongs to current thread, so they must need the next page too
    if(p_dir->pages[page_fault_num].owner == root){
@@ -36,7 +36,7 @@ int swap;
 /* Creates swap file, initailizes page directories, and enables our signal handler */
 int initialize(){
   // Initializes the virtual memory data structure
-  printf("Running init\n");
+  // printf("Running init\n");
   createSwap();
   int context_size = 64000 + sizeof(tcb) + sizeof(ucontext_t);
   page_directory page_dir;
@@ -87,7 +87,7 @@ int initialize(){
   seg.sa_sigaction = seghandler;
 
   if (sigaction(SIGSEGV, &seg, NULL) == -1){
-    printf("Fatal error setting up signal handler\n");
+    // printf("Fatal error setting up signal handler\n");
     exit(EXIT_FAILURE);    //explode!
   }
 
@@ -429,22 +429,28 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
     return -1; //Free failed; cannot free null pointer
   }
 
-
   if(threadreq == 0){
-	int j;
-	if(item > c_dir){
-		for(j = 0; j < NUM_CONTEXTS; j++){
-			if(c_dir->contexts[j].owner == (tcb*) item){
-				c_dir->contexts[j].available = 1;
-			}
-		}
-	}
-	else{
-		//tcb* owner = (my_pthread_mutex_t*)item->head;
-		int index = ((int)(item - ((void*)m_dir + sizeof(mutex_directory)))) / sizeof(my_pthread_mutex_t);
-		m_dir->mutexes[index].available = 1;
-	}
-	return;
+  	int j;
+  	if(item > c_dir){
+  		for(j = 0; j < NUM_CONTEXTS; j++){
+  			if(c_dir->contexts[j].owner == (tcb*) item){
+  				c_dir->contexts[j].available = 1;
+  			}
+  		}
+      //for(j = 0; j < NUM_PAGES; j++){
+        // if(p_dir->pages[j].owner == (tcb*) item){
+      //     p_dir->pages[j].available = 1;
+      //     if(j < SHALLOC_PAGE_START){
+      //         memset(mem[(p_dir->pages[j].start_index)], 0 , PAGE_SIZE);
+      //     }
+      //   }
+      // }
+  	} else {
+  		//tcb* owner = (my_pthread_mutex_t*)item->head;
+  		int index = ((int)(item - ((void*)m_dir + sizeof(mutex_directory)))) / sizeof(my_pthread_mutex_t);
+  		m_dir->mutexes[index].available = 1;
+  	}
+  	return;
   }
 
 
@@ -455,6 +461,14 @@ int mydeallocate(void* item, char* file, unsigned int line, int threadreq){
   mem_entry* temp;
   mem_entry* next;
   mem_entry* prev;
+
+  if(head != NULL){ //This will trigger a segfault if page is mprotected
+    if(did_segfault || head->size == 0){
+      did_segfault = 0;
+      head = p_dir->pages[1001].head;
+    }
+  }
+
   temp = (mem_entry*)((char*)item - sizeof(mem_entry));
   if(temp->available == 1){
     sigprocmask(SIG_SETMASK, &b, NULL);
